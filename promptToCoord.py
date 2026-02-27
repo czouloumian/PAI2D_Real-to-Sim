@@ -12,7 +12,7 @@ def ollama_run(): #TODO ne marche pas vraiment (ou alors mon pc est lent), pour 
         subprocess.check_output(["pgrep", "Ollama"])
     except subprocess.CalledProcessError:
         print("Starting Ollama")
-        subprocess.Popen(["open", "-a", "Ollama"])
+        subprocess.Popen(["ollama", "serve"])
         print("it's opennn")
         time.sleep(5)
 
