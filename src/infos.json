@@ -1,0 +1,4 @@
+{
+    "Objets": [{"id":"drawer","urdf":"drawer.urdf"}],
+    "Relations": [{"type":"on", "subject":"drawer", "objet":"table"}]
+}
