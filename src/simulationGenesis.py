@@ -21,7 +21,9 @@ def create_scene(objetsList):
             gs.morphs.URDF(
                 file=obj['path'],
                 pos=obj['pos'],
-            )
+                scale=1.0,
+            ),
+           # material=gs.materials.Rigid(rho=1000) #pour essayer de regler le pb d'objets pas solides
         )
 
     scene.build()
