@@ -6,7 +6,6 @@ import re
 url = "http://localhost:11434/api/generate"
 
 def instruction_to_json(instruction, output_file="scene.json"):
-
     prompt = f"""
 You convert natural language scene descriptions into structured JSON.
 Instruction:
@@ -58,15 +57,14 @@ Rules:
         print(json_text)
         return None
 
-
     with open(output_file, "w", encoding="utf-8") as f:
         json.dump(scene_json, f, indent=2)
     print("JSON sauvegardé dans :", os.path.abspath(output_file))
 
     return scene_json
 
-
 instruction = "un livre et un arbre a sa gauche avec deux chaises cote a cote sur la droite du livre"
 scene_json = instruction_to_json(instruction)
 if scene_json:
-    print(json.dumps(scene_json, indent=2))
+  print(json.dumps(scene_json, indent=2))
+  #print(scene_json)
