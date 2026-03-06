@@ -1,0 +1,19 @@
+{
+  "objects": [
+    {
+      "id": "mug",
+      "urdf": "baby_highchair/cup"
+    },
+    {
+      "id": "drawer",
+      "urdf": "box-shelf.urdf"
+    }
+  ],
+  "relations": [
+    {
+      "type": "on",
+      "subject": "mug",
+      "object": "drawer"
+    }
+  ]
+}

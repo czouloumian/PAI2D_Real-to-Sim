@@ -1,0 +1,19 @@
+{
+  "objects": [
+    {
+      "id": "mug",
+      "urdf": "cabinet-drawer.urdf"
+    },
+    {
+      "id": "tiroir",
+      "urdf": "tire-lift_door_base.urdf"
+    }
+  ],
+  "relations": [
+    {
+      "type": "on",
+      "subject": "mug",
+      "object": "tiroir"
+    }
+  ]
+}
