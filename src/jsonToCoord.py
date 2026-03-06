@@ -2,6 +2,13 @@ import json
 import os
 import xml.etree.ElementTree as ET
 import random
+import trimesh
+
+
+'''
+Des liens utiles:
+https://wiki.ros.org/urdf/XML/link
+'''
 
 
 def readJSON(path):
@@ -85,16 +92,38 @@ def getDimensions(objet):
             size = box.attrib['size'].split()
             objet['dimensions'] = (float(size[0]),float(size[1]), float(size[2]))
             return objet
+        
+        cylinder= geometry.find('cylinder')
+        if cylinder is not None:
+            r = float(cylinder.attrib['radius'])
+            length = float(cylinder.attrib['length'])
+            objet['dimensions'] = (r*2, r*2, length)
+            return objet
+        
+        sphere= geometry.find('sphere')
+        if sphere is not None:
+            r = float(sphere.attrib['radius'])
+            objet['dimensions'] = (r*2, r*2, r*2)
+            return objet
+        
+        mesh_tag = geometry.find('mesh') #quand les formes sont plus complexes c'est généralement mesh qui est utilisé
+        if mesh_tag is not None:
+            directory = os.path.dirname(objet['path'])
+            path_mesh = os.path.join(directory, mesh_tag.attrib['filename'])
+            mesh = trimesh.load(path_mesh, force='mesh') #force='mesh' est pour ne pas avoir de scene, seulement un mesh unique
+            bounds = mesh.bounding_box.extents
+            objet['dimensions'] = (float(bounds[0]),float(bounds[1]),float(bounds[2]))
+            return objet
 
-    #TODO: regarder s'il y a d'autres choses possible que box
-    print("Dimensions non trouvées")
+    print("Dimensions non trouvées") #TODO: faire une meilleure erreur
     objet['dimensions'] = (0.1,0.1,0.1)
     return objet
 
 
 def getRoot(objects):
     '''
-    Trouve l'objet root et lui donnes les dimensions de base; le met dans placed_objects
+    Trouve l'objet root et lui donnes les dimensions de base; le met dans placed_objects.
+    Donne des dimensions de base à tous les objets, qui seront modifiées ensuite en fonction des relations.
 
     :param objects: les objets
     :return: objets et les objets placés qui ne contient que le root pour l'instant
@@ -104,8 +133,8 @@ def getRoot(objects):
     for obj in objects:
         obj = getDimensions(obj)
         (width, depth, height) = obj['dimensions']
+        obj['pos'] = (0,0,0.01 + height/2) #height/2 car les objets sont placés par leur centre 
         if obj['root'] == "true":
-            obj['pos'] = (0,0,0.01 + height/2) #height/2 car les objets sont placés par leur centre 
             placed_objects.add(obj['id'])
 
     return objects, placed_objects
@@ -113,7 +142,7 @@ def getRoot(objects):
 
 def generateCoord(objects, relations):
     '''
-    Genere les coordonnees x,y,z de l'objet en fonction de sa relation avec un autre objet.
+    Adapte les coordonnees x,y,z des objets en fonction des relations.
     '''
     #on, under, next_to, in
 
@@ -136,14 +165,30 @@ def generateCoord(objects, relations):
                 object = getDimensions(object)
                 (width, depth, height) = object['dimensions']
                 (x,y,z) = object['pos']
-                if rel['type'] == 'on': #TODO: prendre en compte les dimensions du sujet pour ne pas etre trop au bord
-                    subject_x = random.uniform(x - width/2, x + width/2)
-                    subject_y = random.uniform(y - depth/2, y + depth/2)
-                    subject_z = z + height + 0.01
-                elif rel['type'] == 'nextTo':
-                    subject_x = random.uniform(x + width/2, x + width*2) #TODO: revoir ces ranges
-                    subject_y = random.uniform(y + depth/2, y + depth*2)
+                subject = getDimensions(subject)
+                (subject_w, subject_d, subject_h) = subject['dimensions']
+                (subject_x, subject_y, subject_z) = subject['pos']
+                if rel['type'] == 'on':
+                    subject_x += random.uniform(x - width/2 + subject_w/2, x + width/2 - subject_w/2) #prise en compte des dims du sujet pour ne pas etre trop au bord
+                    subject_y += random.uniform(y - depth/2 + subject_d/2, y + depth/2 - subject_d/2)
+                    subject_z += z + height
+                #TODO: pour les elifs suivants: changer le x ou y aussi avec random en fonction des dimensions de l'objet?
+                #TODO: rendre ce code plus efficace et modulable
+                elif rel['type'] == 'inFrontOf': #TODO: deal avec les choses qui dépassent des dimensions comme la poignée
+                    subject_x += random.uniform(x + width/2 + subject_w/2, x + width + subject_w/2)
                     subject_z = z
+                elif rel['type'] == 'behind': # TODO: pb: la handle du mug. on laisse à la validation vlm et les quaternions ou pas? 
+                    #subject_x += random.uniform(x - width/2 - subject_w/2, x - width - subject_w/2)
+                    subject_x += random.uniform(x - width/2 - subject_w , x - width - subject_w/2) #temp fix
+                    subject_z = z
+                elif rel['type'] == 'rightOf':
+                    subject_y += random.uniform(y + depth/2 + subject_d/2, y + depth + subject_d/2)
+                    subject_z = z
+                elif rel['type'] == 'leftOf':
+                    subject_y += random.uniform(y - depth/2 - subject_d/2, y - depth - subject_d/2)
+                    subject_z = z
+                elif rel['type'] == 'against': #TODO
+                    pass
                 subject['pos'] = (subject_x, subject_y, subject_z)
                 placed_objects.add(subject_id)
                 reste.remove(rel)
