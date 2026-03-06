@@ -1,0 +1,4 @@
+{
+    "Objets": [{"id":"drawer","urdf":"drawer.urdf", "root":"true"},{"id":"mug","urdf":"ycb_mug.urdf", "root":"false"}],
+    "Relations": [{"type":"on", "subject":"mug", "object":"drawer"}]
+}
