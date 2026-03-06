@@ -66,7 +66,7 @@ Rules:
     return scene_json
 
 
-instruction = "un livre et un arbre a sa gauche avec deux chaises cote a cote sur la droite du livre"
-scene_json = instruction_to_json(instruction)
-if scene_json:
-    print(json.dumps(scene_json, indent=2))
+#instruction = "un livre et un arbre a sa gauche avec deux chaises cote a cote sur la droite du livre"
+#scene_json = instruction_to_json(instruction)
+#if scene_json:
+#    print(json.dumps(scene_json, indent=2))

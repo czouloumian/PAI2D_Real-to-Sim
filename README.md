@@ -26,16 +26,14 @@ conda create -n realtosim-env -y
 conda activate realtosim-env
 ``` 
 
-(documentation en cours)
-
 **3. Installer PyTorch, Genesis et Ollama (et les modèles llama 3.1 et 3.2-Vision)**
 
 ```  bash
 pip install torch torchvision
 pip install genesis-world
 curl -fsSL https://ollama.com/install.sh | sh
-ollama pull llama3.1
-ollama pull llama3.2-vision
+ollama run llama3.1
+ollama run llama3.2-vision
 ``` 
 
 ## Exécution du projet:
