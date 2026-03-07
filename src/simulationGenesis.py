@@ -15,7 +15,6 @@ def create_scene(objetsList):
     plane = scene.add_entity(gs.morphs.Plane()) #la ground plaine
 
     #ajout des objets: une boucle for qui prend l'objet, sa position, son filepath, et qui crée les objets un par un
-    #TODO: y a t il un ordre dans lequel les rajouter en fonction de leur relations?
     for obj in objetsList:
         entity = scene.add_entity(
             gs.morphs.URDF(

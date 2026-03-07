@@ -8,28 +8,29 @@ import trimesh
 '''
 Des liens utiles:
 https://wiki.ros.org/urdf/XML/link
+https://genesis-world.readthedocs.io/en/latest/user_guide/getting_started/conventions.html
 '''
 
 
 def readJSON(path):
     '''
-    Lit le JSON et extrait les informations en liste d'objets et leur relations
+    Lit le JSON et extrait les informations en liste d'items et leur relations
 
     :param path: le path du fichier JSON
-    :return objets: la liste de dicts d'objet contenant id et urdf
-    :return relations: la liste de dicts de relations (type, subject, objet)
+    :return items: la liste de dicts d'item contenant id et urdf
+    :return relations: la liste de dicts de relations (type, subject, item)
     '''
     with open(path, 'r') as file:
         data = json.load(file)
-    objets = data.get('Objets', [])
+    items = data.get('Objets', [])
     relations = data.get('Relations', [])
 
-    return objets, relations
+    return items, relations
 
 
-def addMass(filepath): #TODO: c'est une tentative de regler le pb des objets de la librairie partnet partial qui ne veulent pas s'afficher sur genesis; ne marche pas pour l'instant.
+def addMass(filepath): #TODO: c'est une tentative de regler le pb des items de la librairie partnet partial qui ne veulent pas s'afficher sur genesis; ne marche pas pour l'instant.
     '''
-    Ajoute une masse à l'objet urdf pour qu'il soit solide dans la simulation. Ajoute aussi la résistance
+    Ajoute une masse à l'item urdf pour qu'il soit solide dans la simulation. Ajoute aussi la résistance
     à la rotation (distribution de la masse) #TODO: valeurs plus réalistes
 
     :param filepath: le path pour le file urdf original
@@ -59,147 +60,177 @@ def addMass(filepath): #TODO: c'est une tentative de regler le pb des objets de 
     return patched_filepath
     
 
-def getFilePath(objet):
+def getFilePath(item):
     '''
-    Donne le path pour l'objet URDF.
+    Donne le path pour l'item URDF.
 
-    :param objet: le dictionnaire d'objet avec id et urdf
-    :return path: le path pour l'objet
+    :param item: le dictionnaire d'item avec id et urdf
+    :return path: le path pour l'item
     '''
-    objets_folder = os.path.join(os.path.dirname(__file__),'..', 'objets')
-    path = os.path.join(objets_folder, objet['urdf'])
+    items_folder = os.path.join(os.path.dirname(__file__),'..', 'objets')
+    path = os.path.join(items_folder, item['urdf'])
     if not os.path.exists(path):
-        raise FileNotFoundError(f"Pour {objet['id']}, le fichier {objet['urdf']} est introuvable.")
+        raise FileNotFoundError(f"Pour {item['id']}, le fichier {item['urdf']} est introuvable.")
     #path = addMass(path)
         
     return path
 
 
-def getDimensions(objet):
+def getDimensions(item):
     '''
-    Extrait les dimensions de l'objet URDF, qui sont dans '<geometry>'
+    Extrait les dimensions de l'item URDF, qui sont dans '<geometry>'
 
     :param filepath: le path pour le file urdf
-    :return: dimensions de l'objet
+    :return: dimensions de l'item
     '''
 
-    tree = ET.parse(objet['path']) #lecture du fichier urdf en xml
+    tree = ET.parse(item['path']) #lecture du fichier urdf en xml
     root = tree.getroot()
-    
+
     for geometry in root.iter('geometry'):
         box= geometry.find('box')
         if box is not None:
             size = box.attrib['size'].split()
-            objet['dimensions'] = (float(size[0]),float(size[1]), float(size[2]))
-            return objet
+            item['dimensions'] = (float(size[0]),float(size[1]), float(size[2]))
+            return item
         
         cylinder= geometry.find('cylinder')
         if cylinder is not None:
             r = float(cylinder.attrib['radius'])
             length = float(cylinder.attrib['length'])
-            objet['dimensions'] = (r*2, r*2, length)
-            return objet
+            item['dimensions'] = (r*2, r*2, length)
+            return item
         
         sphere= geometry.find('sphere')
         if sphere is not None:
             r = float(sphere.attrib['radius'])
-            objet['dimensions'] = (r*2, r*2, r*2)
-            return objet
+            item['dimensions'] = (r*2, r*2, r*2)
+            return item
         
         mesh_tag = geometry.find('mesh') #quand les formes sont plus complexes c'est généralement mesh qui est utilisé
         if mesh_tag is not None:
-            directory = os.path.dirname(objet['path'])
+            directory = os.path.dirname(item['path'])
             path_mesh = os.path.join(directory, mesh_tag.attrib['filename'])
             mesh = trimesh.load(path_mesh, force='mesh') #force='mesh' est pour ne pas avoir de scene, seulement un mesh unique
             bounds = mesh.bounding_box.extents
-            objet['dimensions'] = (float(bounds[0]),float(bounds[1]),float(bounds[2]))
-            return objet
+            item['dimensions'] = (float(bounds[0]),float(bounds[1]),float(bounds[2]))
+            return item
 
     print("Dimensions non trouvées") #TODO: faire une meilleure erreur
-    objet['dimensions'] = (0.1,0.1,0.1)
-    return objet
+    item['dimensions'] = (0.1,0.1,0.1)
+    return item
 
 
-def getRoot(objects):
+def initPosAndQuat(items):
     '''
-    Trouve l'objet root et lui donnes les dimensions de base; le met dans placed_objects.
-    Donne des dimensions de base à tous les objets, qui seront modifiées ensuite en fonction des relations.
+    Initialise les positions et orientations des objets.
+    Donne des orientations et positions de base à tous les items, qui seront modifiées ensuite en fonction des relations.
 
-    :param objects: les objets
-    :return: objets et les objets placés qui ne contient que le root pour l'instant
+    :param items: les items
+    :return: les items mais avec des positions et orientations de base.
     '''
-    placed_objects = set() #retiens les objets placés
-
-    for obj in objects:
-        obj = getDimensions(obj)
-        (width, depth, height) = obj['dimensions']
-        obj['pos'] = (0,0,0.01 + height/2) #height/2 car les objets sont placés par leur centre 
-        if obj['root'] == "true":
-            placed_objects.add(obj['id'])
-
-    return objects, placed_objects
+    for item in items:
+        item = getDimensions(item)
+        (_, _, height) = item['dimensions']
+        item['pos'] = (0,0,0.01 + height/2) #height/2 car les items sont placés par leur centre 
+        item['quat'] = (0,0,0,1) #pas de rotation
+    return items
 
 
-def generateCoord(objects, relations):
+def getRoot(items):
     '''
-    Adapte les coordonnees x,y,z des objets en fonction des relations.
+    Trouve l'item root et le met dans placed_items.
+    
+    :param items: les items
+    :return: les items placés qui ne contient que le root pour l'instant
     '''
-    #on, under, next_to, in
+    placed_items = set() #retiens les items placés
 
-    objects_dict = {obj['id']: obj for obj in objects} #pour pouvoir acceder aux differents objets plus facilement
+    for item in items:
+        if item['root'] == "true":
+            placed_items.add(item['id'])
 
-    objects, placed_objects = getRoot(objects)
+    return placed_items
 
-    #TODO: transformer les under en on en echangeant objet et sujet
+
+def simplifyRelations(relations):
+    '''
+    Transforme les relations 'under' en relation 'on' en échangeant le sujet et l'objet pour garder une logique par rapport au processus de placement.
+
+    :param relations: les relations
+    :return: les relations avec des 'on' au lieu des 'under'
+    '''
+    for rel in relations:
+        if rel['type'] == 'under':
+            rel['subject'], rel['object'] = rel['object'], rel['subject']
+            rel['type'] = 'on'
+    return relations
+
+
+def generateCoord(items, relations):
+    '''
+    Adapte les coordonnees x,y,z des items en fonction des relations.
+
+    :param items: liste de dict d'items
+    :param relations: les relations entre les items
+    :return: items, les items avec les bonnes coordonnées et les bonnes 
+    '''
+
+    items_dict = {item['id']: item for item in items} #pour pouvoir acceder aux differents items plus facilement
+
+    items = initPosAndQuat(items)
+    placed_items = getRoot(items)
+    
+    relations = simplifyRelations(relations)
 
     reste = relations.copy() #les relations non effectuées
     while reste:
         for rel in reste:
-            object_id = rel['object']
+            item_id = rel['object'] #l'objet comparé au sujet, mais c'est dangereux d'utiliser object en python vu que ça existe déjà
             subject_id = rel['subject']
-            object = objects_dict[object_id]
-            subject = objects_dict[subject_id]
-            if object_id not in placed_objects:
+            item = items_dict[item_id]
+            subject = items_dict[subject_id]
+            if item_id not in placed_items:
                 continue
             else:
-                object = getDimensions(object)
-                (width, depth, height) = object['dimensions']
-                (x,y,z) = object['pos']
+                item = getDimensions(item)
+                (width, depth, height) = item['dimensions']
+                (x,y,z) = item['pos']
                 subject = getDimensions(subject)
                 (subject_w, subject_d, subject_h) = subject['dimensions']
                 (subject_x, subject_y, subject_z) = subject['pos']
                 if rel['type'] == 'on':
                     subject_x += random.uniform(x - width/2 + subject_w/2, x + width/2 - subject_w/2) #prise en compte des dims du sujet pour ne pas etre trop au bord
                     subject_y += random.uniform(y - depth/2 + subject_d/2, y + depth/2 - subject_d/2)
-                    subject_z += z + height
-                #TODO: pour les elifs suivants: changer le x ou y aussi avec random en fonction des dimensions de l'objet?
+                    subject_z += z + height/2
+                #TODO: pour les elifs suivants: changer le x ou y aussi avec random en fonction des dimensions de l'item?
                 #TODO: rendre ce code plus efficace et modulable
-                elif rel['type'] == 'inFrontOf': #TODO: deal avec les choses qui dépassent des dimensions comme la poignée
+                elif rel['type'] == 'in_front_of': #TODO: deal avec les choses qui dépassent des dimensions comme la poignée
                     subject_x += random.uniform(x + width/2 + subject_w/2, x + width + subject_w/2)
                     subject_z = z
                 elif rel['type'] == 'behind': # TODO: pb: la handle du mug. on laisse à la validation vlm et les quaternions ou pas? 
                     #subject_x += random.uniform(x - width/2 - subject_w/2, x - width - subject_w/2)
                     subject_x += random.uniform(x - width/2 - subject_w , x - width - subject_w/2) #temp fix
                     subject_z = z
-                elif rel['type'] == 'rightOf':
+                elif rel['type'] == 'right_of':
                     subject_y += random.uniform(y + depth/2 + subject_d/2, y + depth + subject_d/2)
                     subject_z = z
-                elif rel['type'] == 'leftOf':
+                elif rel['type'] == 'left_of':
                     subject_y += random.uniform(y - depth/2 - subject_d/2, y - depth - subject_d/2)
                     subject_z = z
                 elif rel['type'] == 'against': #TODO
                     pass
                 subject['pos'] = (subject_x, subject_y, subject_z)
-                placed_objects.add(subject_id)
+                placed_items.add(subject_id)
                 reste.remove(rel)
-    return objects
+    return items
 
 
-def createObjectList(objets, relations):
+def buildScene(items, relations):
     '''
-    Ajoute à une liste de dictionnaires (un dict par objet), toutes les infos nécessaies à la simulation, donc path et pos
+    Ajoute à une liste de dictionnaires (un dict par item), toutes les infos nécessaies à la simulation, donc path et pos
     '''
-    for obj in objets:
-        obj['path'] = getFilePath(obj)
-    objets = generateCoord(objets,relations)
-    return objets
+    for item in items:
+        item['path'] = getFilePath(item)
+    items = generateCoord(items,relations)
+    return items
