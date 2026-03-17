@@ -8,7 +8,7 @@ def create_scene(objetsList):
 
     :param objets: une liste de dictionnaires des infos pour chaque objet (id, urdf, path, pos)
     '''
-    gs.init(backend=gs.cuda)
+    gs.init(backend=gs.cpu)
 
     scene = gs.Scene(show_viewer=True)
 

@@ -22,8 +22,8 @@ def readJSON(path):
     '''
     with open(path, 'r') as file:
         data = json.load(file)
-    items = data.get('Objets', [])
-    relations = data.get('Relations', [])
+    items = data.get('objects', [])
+    relations = data.get('relations', [])
 
     return items, relations
 
@@ -68,12 +68,23 @@ def getFilePath(item):
     :return path: le path pour l'item
     '''
     items_folder = os.path.join(os.path.dirname(__file__),'..', 'objets')
-    path = os.path.join(items_folder, item['urdf'])
-    if not os.path.exists(path):
+    base = os.path.join(items_folder, item['urdf'])
+    if not os.path.exists(base):
         raise FileNotFoundError(f"Pour {item['id']}, le fichier {item['urdf']} est introuvable.")
     #path = addMass(path)
-        
-    return path
+
+
+    # si c'est un dossier on cherche un fichier qui existe
+    if os.path.isdir(base):
+        for name in ["mobility.urdf", "kinbody.xml", "textured.obj", "nontextured.stl", "nontextured.ply"]:
+            path = os.path.join(base, name)
+            if os.path.exists(path):
+                return path
+
+        raise FileNotFoundError(f"Aucun fichier exploitable trouvé dans {base}")
+
+    return base
+
 
 
 def getDimensions(item):
@@ -144,11 +155,14 @@ def getRoot(items):
     :param items: les items
     :return: les items placés qui ne contient que le root pour l'instant
     '''
-    placed_items = set() #retiens les items placés
+    placed_items = set()
 
     for item in items:
-        if item['root'] == "true":
+        if item.get('root') is True:
             placed_items.add(item['id'])
+
+    if not placed_items:
+        raise ValueError("Aucun objets trouvés smh")
 
     return placed_items
 
@@ -185,7 +199,8 @@ def generateCoord(items, relations):
 
     reste = relations.copy() #les relations non effectuées
     while reste:
-        for rel in reste:
+        progression = False
+        for rel in reste[:]:
             item_id = rel['object'] #l'objet comparé au sujet, mais c'est dangereux d'utiliser object en python vu que ça existe déjà
             subject_id = rel['subject']
             item = items_dict[item_id]
@@ -223,6 +238,9 @@ def generateCoord(items, relations):
                 subject['pos'] = (subject_x, subject_y, subject_z)
                 placed_items.add(subject_id)
                 reste.remove(rel)
+                progression = True
+        if not progression:
+            raise ValueError(f"Impossible de placer les relations restantes : {reste}")
     return items
 
 
