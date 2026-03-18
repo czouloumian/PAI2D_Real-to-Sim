@@ -1,19 +1,37 @@
 {
   "objects": [
     {
-      "id": "mug",
-      "urdf": "baby_highchair/cup"
+      "id": "book",
+      "urdf": "book.urdf"
     },
     {
-      "id": "drawer",
-      "urdf": "box-shelf.urdf"
+      "id": "tree",
+      "urdf": "tree.urdf"
+    },
+    {
+      "id": "chair_1",
+      "urdf": "chair_1.urdf"
+    },
+    {
+      "id": "chair_2",
+      "urdf": "chair_2.urdf"
     }
   ],
   "relations": [
     {
-      "type": "on",
-      "subject": "mug",
-      "object": "drawer"
+      "type": "left_of",
+      "subject": "book",
+      "object": "tree"
+    },
+    {
+      "type": "right_of",
+      "subject": "book",
+      "object": "chair_1"
+    },
+    {
+      "type": "right_of",
+      "subject": "book",
+      "object": "chair_2"
     }
   ]
 }
