@@ -10,8 +10,8 @@ def readJSON(path):
     '''
     with open(path, 'r') as file:
         data = json.load(file)
-    items = data.get('Objets', [])
-    relations = data.get('Relations', [])
+    items = data.get('objets', [])
+    relations = data.get('relations', [])
     relations = simplifyRelations(relations)
 
     return items, relations

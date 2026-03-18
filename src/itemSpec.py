@@ -11,11 +11,22 @@ def getFilePath(item):
     :return path: le path pour l'item
     '''
     items_folder = os.path.join(os.path.dirname(__file__),'..', 'objets')
-    path = os.path.join(items_folder, item['urdf'])
-    if not os.path.exists(path):
+    base = os.path.join(items_folder, item['urdf'])
+    if not os.path.exists(base):
         raise FileNotFoundError(f"Pour {item['id']}, le fichier {item['urdf']} est introuvable.")
     #path = addMass(path)
-    return path
+
+    #TODO: question: pourquoi on cherche d'autres fichiers que mobility.urdf?
+    # si c'est un dossier on cherche un fichier qui existe
+    if os.path.isdir(base):
+        for name in ["mobility.urdf", "kinbody.xml", "textured.obj", "nontextured.stl", "nontextured.ply"]:
+            path = os.path.join(base, name)
+            if os.path.exists(path):
+                return path
+
+        raise FileNotFoundError(f"Aucun fichier exploitable trouvé dans {base}")
+
+    return base
 
 
 def getOriginalDimensions(item):

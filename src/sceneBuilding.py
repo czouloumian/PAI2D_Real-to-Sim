@@ -67,11 +67,14 @@ def getRoot(items):
     :param items: les items
     :return: les items placés qui ne contient que le root pour l'instant
     '''
-    placed_items = set() #retiens les items placés
+    placed_items = set()
 
     for item in items:
-        if item['root'] == "true":
+        if item.get('root') is True:
             placed_items.add(item['id'])
+
+    if not placed_items:
+        raise ValueError("Aucun objets trouvés smh")
 
     return placed_items
 
@@ -148,7 +151,8 @@ def processRelations(items, relations):
 
     reste = relations.copy() #les relations non effectuées
     while reste:
-        for rel in reste:
+        progression = False
+        for rel in reste[:]:
             item_id = rel['object'] #l'objet comparé au sujet, mais c'est dangereux d'utiliser object en python vu que ça existe déjà
             subject_id = rel['subject']
             item = items_dict[item_id] #TODO: maybe utiliser une autre nom que item dans ce contexte et seulement ce contexte
@@ -159,6 +163,9 @@ def processRelations(items, relations):
                 changePosFromRel(rel, item, subject)
                 placed_items.add(subject_id)
                 reste.remove(rel)
+                progression = True
+        if not progression:
+            raise ValueError(f"Impossible de placer les relations restantes : {reste}")
     return items
 
 
