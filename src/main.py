@@ -1,7 +1,8 @@
 import os
 
 from simulationGenesis import create_scene
-from jsonToCoord import buildScene, readJSON
+from sceneBuilding import buildScene
+from jsonParsing import readJSON
 from promptToJson import instruction_to_json
 
 def main():
