@@ -12,38 +12,6 @@ https://genesis-world.readthedocs.io/en/latest/user_guide/getting_started/conven
 '''
 
 
-def addMass(filepath): #TODO: c'est une tentative de regler le pb des items de la librairie partnet partial qui ne veulent pas s'afficher sur genesis; ne marche pas pour l'instant.
-    '''
-    Ajoute une masse à l'item urdf pour qu'il soit solide dans la simulation. Ajoute aussi la résistance
-    à la rotation (distribution de la masse) #TODO: valeurs plus réalistes
-
-    :param filepath: le path pour le file urdf original
-    :return patched_filepath: le path pour le file urdf modifié avec la masse
-    '''
-    tree = ET.parse(filepath) #lecture du fichier urdf en xml
-    root = tree.getroot()
-
-    for link in root.findall('link'):
-        for collision in link.findall('collision'):
-            link.remove(collision)
-
-        inertial = link.find('inertial')
-        if inertial is None:
-            inertial = ET.SubElement(link, 'inertial')
-            mass = ET.SubElement(inertial, 'mass')
-            mass.set('value', '1.0') 
-            mass_inertia = ET.SubElement(inertial, 'inertia')
-            mass_inertia.set('ixx', '0.1')
-            mass_inertia.set('ixy', '0.0')
-            mass_inertia.set('ixz', '0.0')
-            mass_inertia.set('iyy', '0.1')
-            mass_inertia.set('iyz', '0.0')
-            mass_inertia.set('izz', '0.1')
-    patched_filepath = filepath.replace('.urdf', '_patched.urdf')
-    tree.write(patched_filepath)
-    return patched_filepath
-
-
 def initPosAndQuat(items):
     '''
     Initialise les positions et orientations des objets.
@@ -147,7 +115,7 @@ def processRelations(items, relations):
     items = initPosAndQuat(items)
     placed_items = getRoot(items)
     
-    relations = simplifyRelations(relations)
+    #relations = simplifyRelations(relations)
 
     reste = relations.copy() #les relations non effectuées
     while reste:
