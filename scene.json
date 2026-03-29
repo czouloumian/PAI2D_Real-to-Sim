@@ -1,37 +1,19 @@
 {
   "objects": [
     {
-      "id": "book",
-      "urdf": "book.urdf"
+      "id": "mug",
+      "urdf": "cabinet-drawer.urdf"
     },
     {
-      "id": "tree",
-      "urdf": "tree.urdf"
-    },
-    {
-      "id": "chair_1",
-      "urdf": "chair_1.urdf"
-    },
-    {
-      "id": "chair_2",
-      "urdf": "chair_2.urdf"
+      "id": "tiroir",
+      "urdf": "tire-lift_door_base.urdf"
     }
   ],
   "relations": [
     {
-      "type": "left_of",
-      "subject": "book",
-      "object": "tree"
-    },
-    {
-      "type": "right_of",
-      "subject": "book",
-      "object": "chair_1"
-    },
-    {
-      "type": "right_of",
-      "subject": "book",
-      "object": "chair_2"
+      "type": "on",
+      "subject": "mug",
+      "object": "tiroir"
     }
   ]
 }
