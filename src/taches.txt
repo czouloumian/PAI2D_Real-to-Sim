@@ -1,0 +1,5 @@
+- bouton nouveau thread pour une nouvelle scene 
+- bouton pour ajouter des images + traitements des images 
+- update le bouton envoyer pour avoir un fils de discussion
+- place une poubelle sur une table
+Erreur inattendue : name 'objets_reconnus' is not defined -> doit rendre un objet n'est pas sur la liste et propose un remplacement ou la suppression de l'objets

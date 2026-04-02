@@ -7,6 +7,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtCore import QTimer
 from app import MainWindow
+from promptToJson_ import object_dim_quat, object_rec
 
 OBJETS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "objets")
 
@@ -30,6 +31,12 @@ OBJETS_LIST_TEST = [
     },
 ]
 
+user_prompt = "place une poubelle sur un lave linge"
+objets_reconnus, non_reconnus = object_rec(user_prompt)
+print("Reconnus:", objets_reconnus)
+print("Non reconnus:", non_reconnus)
+OBJETS_LIST_TEST_2 = object_dim_quat(user_prompt,objets_reconnus)
+print(OBJETS_LIST_TEST_2)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
@@ -37,9 +44,9 @@ if __name__ == "__main__":
     window.show()
     def load_test_scene():
         try:
-            for obj in OBJETS_LIST_TEST:
+            for obj in OBJETS_LIST_TEST_2:
                 print(json.dumps(obj, indent=2))
-            window._on_scene_ready(OBJETS_LIST_TEST)
+            window._on_scene_ready(OBJETS_LIST_TEST_2)
             window._append_message(
                 "TEST Scene hardcodee: lave-linge + poubelle a cote",
                 "system"
