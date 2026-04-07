@@ -3,6 +3,8 @@
         {
             "id": "mug",
             "urdf": "ycb_mug.urdf",
+            "path": "/home/invite/PAI2D_Real-to-Sim/src/version2/../../objets/ycb_mug.urdf",
+            "scale": 0.26,
             "pos": [
                 0.5,
                 0.5,
@@ -14,7 +16,6 @@
                 0,
                 1
             ],
-            "path": "/home/invite/PAI2D_Real-to-Sim/src/version2/../../objets/ycb_mug.urdf",
             "dimensions": [
                 0.116984,
                 0.093131,
@@ -24,6 +25,8 @@
         {
             "id": "drawer",
             "urdf": "drawer.urdf",
+            "path": "/home/invite/PAI2D_Real-to-Sim/src/version2/../../objets/drawer.urdf",
+            "scale": 0.26,
             "pos": [
                 0.0,
                 0.0,
@@ -35,7 +38,6 @@
                 0,
                 1
             ],
-            "path": "/home/invite/PAI2D_Real-to-Sim/src/version2/../../objets/drawer.urdf",
             "dimensions": [
                 0.006,
                 0.19,

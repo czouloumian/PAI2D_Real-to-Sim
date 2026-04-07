@@ -1,6 +1,6 @@
 import genesis as gs
 import os
-from PIL import Image #https://pillow.readthedocs.io/en/stable/
+from PIL import Image, ImageDraw, ImageFont #https://pillow.readthedocs.io/en/stable/
 
 #TODO
 #prendre le truc pour lire le JSON et extraire les infos des objets
@@ -27,6 +27,8 @@ def create_scene(objetsList):
         "top":scene.add_camera(res=(640, 480), pos=(0.0, 0.0, 4.0), lookat=(0, 0, 0),   fov=40),
         "side":scene.add_camera(res=(640, 480), pos=(0.0, 3.5, 1.0), lookat=(0, 0, 0.5), fov=30)
     }
+
+    font = ImageFont.load_default()
 
     #ajout des objets: une boucle for qui prend l'objet, sa position, son filepath, et qui crée les objets un par un
     for obj in objetsList:

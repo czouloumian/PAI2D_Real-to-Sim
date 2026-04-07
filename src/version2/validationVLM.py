@@ -87,137 +87,131 @@ def checkOverlap(items):
     return True
 
 
-#TODO: une fonction plus propre pour sauvegarder le json corrigé et au propre
+def clean_reponse(resultat):
+    resultat = re.sub(r'```json|```', '', resultat) 
+    resultat = resultat.strip()
+    resultat = resultat.replace("'", '"') 
+    resultat = resultat.replace('True', 'true').replace('False', 'false')
+    start = resultat.find('{')
+    end = resultat.rfind('}') + 1
+    if start != -1 and end != 0:
+        resultat = resultat[start:end]
+    return resultat
 
-
-def validate(prompt, jsonFile, path_to_image, max_iter=5):
-    """
-    On demande au VLM de valider la scene en la comparant au prmpt original.
-
-    :param prompt: le prompt de l'utilisateur
-    :param jsonFile: le fichier JSON contenant les informations sur la scène
-    :param path_to_image: le chemin vers la capture d'écran de la scène générée
-    :return: le nouveau JSON (donc une correction par rapport à l'ancien) et une validation (vraie si la scene semble correcte et fausse dans le cas contraire)
-    """
-    
-    #le system prompt pour dire au VLM quoi faire en general pour la validation
-    system_prompt="""You are a 3D Layout Expert. Your task is to correct the placement of objects based on USER INTENT.
-                    
-                    Your task:
-                    1. Look at the screenshot of a 3D scene
-                    2. Compare it to the original prompt
-                    3. Output a corrected JSON scene if needed
-
-
-                    GEOMETRIC RULES:
-                    1. THE 'ON' RULE: To place Object A ON Object B:
-                    - A.pos[2] (height) MUST BE: B.pos[2] + (B.dimensions[2]/2) + (A.dimensions[2]/2).
-                    - A.pos[0] and A.pos[1] must be within the range of B's dimensions.
-                    - the X and Y must be very close (< 0.1) for A and B.
-                    2. FLOOR RULE: If an object is on the floor, its Z-position is exactly Height/2.
-                    3. AXES: X is horizontal, Y is depth (forward/backward), Z is vertical (up/down).
-
-                    You will receive:
-                    - The original text prompt describing the scene
-                    - The current scene as a JSON object
-                    - a collage containing THREE images of the same scene:
-                        1. PERSPECTIVE VIEW: General context.
-                        2. TOP-DOWN VIEW: Best for X, Y coordinates and checking if objects are side-by-side.
-                        3. SIDE VIEW: Best for Z coordinate (height) to check if objects are floating or clipping into the floor.
-
-                    You MUST respond with ONLY a valid JSON object, exactly in this format:
-                    {
-                        "valid": true,
-                        "feedback": "scene is correct",
-                        "new_scene": {
-                            "objets": [
-                                {"id": "mug", "urdf": "mug.urdf", "pos": [0.0, 0.5, 0.3], "quat": [0.0, 0.0, 0.0, 1.0]},
-                                {"id": "table", "urdf": "table.urdf", "pos": [0.0, 0.0, 0.0], "quat": [0.0, 0.0, 0.0, 1.0]}
-                            ]
-                        }
-                    }
-
-                    RULES:
-                    - ONLY output the JSON object, nothing else
-                    - NO markdown, NO backticks, NO explanations before or after
-                    - Always use double quotes for keys and strings
-                    - Always use lowercase true/false
-                    - Keep the same "id" and "urdf" values as the input JSON
-                    - Keep the same number of objects as the input JSON, do not add or remove objects
-                    - Only change "pos" and "quat" values to fix the scene
-                    - DO NOT change 'id', 'urdf', or 'path'.
-                    - If valid is true, new_scene can be identical to the input
-                    - ALWAYS include the "new_scene" field, even if the scene is valid
-                    - There should NOT be ANY collisions
-                    - If the image shows a gap between objects that should be touching, 'valid' is FALSE.
-                    - If objects overlap (clipping), 'valid' is FALSE."""
-
-
-    #TODO: les criteres de validation pour que la cene soit consideree valide ou pas par le vlm pourraient etre plus precises et specifiees dans le system prompt
-
-    resultat_validation = {"valid": False, "feedback": "Les boucles n'ont pas commencé"}
-
+def boucle_vlm(user_prompt, jsonFile, image_path, max_iter=5):
     for i in range(max_iter):
-
-        print("feedback boucle", i, ":", resultat_validation.get('feedback', 'pas de feedback donné'))
         with open(jsonFile, 'r') as file:
             data = json.load(file)
         itemsList = data.get('objets', [])
         itemsList = getFilePath(itemsList) #TODO: a changer plus tard
         image_paths = create_scene(itemsList)
 
-        reponse = ollama.chat(
-            model="llama3.2-vision",
-            messages=[
-                {'role': 'system', 'content': system_prompt},
-                {'role': 'user','content': f'Original prompt: {prompt}\n Current JSON scene: {json.dumps(data)}\nDoes the image match the prompt? If not, correct the JSON.','images': [path_to_image] }
-            ]
-        )
-
-        resultat = reponse['message']['content']
-        resultat = re.sub(r'```json|```', '', resultat) 
-        resultat = resultat.strip()
-        resultat = resultat.replace("'", '"') 
-        resultat = resultat.replace('True', 'true').replace('False', 'false')
-        start = resultat.find('{')
-        end = resultat.rfind('}') + 1
-        if start != -1 and end != 0:
-            resultat = resultat[start:end]
-
-        print("RÉPONSE BRUTE DU VLM:", resultat)
-        try:
-            resultat_validation = json.loads(resultat)
-        except json.JSONDecodeError:
-            print("JSON invalide généré par le VLM")
-            continue
-
-        if 'new_scene' not in resultat_validation:
-            if 'objets' in resultat_validation:
-                items = resultat_validation['objets']
+        res = etapes_validation(user_prompt,jsonFile,image_path)
+        if res.get("valid")==True:
+            print("scene validée")
+            return res
+        else: #on genere une nouvelle scene apres avoir replacé le json s'il y a bien une nouvelle scene
+            print("echec: ", res.get("feedback"))
+            if "new_scene" in res:
                 with open(jsonFile, 'w') as file:
-                    json.dump({'objets': items}, file)
-                print(f"JSON mis à jour: {items}")
+                    json.dump(res['new_scene']['objets'],file)
             else:
-                print("Champ new_scene manquant, on continue")
-            continue
+                if 'objets' in res:
+                    items = res['objets']
+                    with open(jsonFile, 'w') as file:
+                        json.dump({'objets': items}, file)
+                    print(f"JSON mis à jour: {items}")
+                else:
+                    print("le llm n'a pas donné de nouvelle scene")
+                    continue
+        print(f"itération {i+1}: {res}")
+    return res
 
-        items = resultat_validation['new_scene']['objets']
-        items = getFilePath(items)
-        items = getOriginalDimensions(items)
 
-        if not checkOverlap(items): #s'il y a overlap
-            resultat_validation['valid'] = False
-            continue
+def etapes_validation(original_prompt, jsonFile, image_path):
+    #collisions
+    prompt1 = """You are a collision detector. Check if the objects overlap. if they do, correct the scene so there is no collision anymore. Only correct the posistion, "pos".
 
-        if resultat_validation['valid']:
-            print(f"Scène validée après {i+1} itérations")
-            with open(jsonFile, 'w') as file:
-                json.dump({'objets': items}, file, indent=4)
-            return resultat_validation
-        #si pas valide,ça met à jour le json pour la prochaine itération
-        with open(jsonFile, 'w') as file:
-            json.dump({'objets': items}, file)
+                You will receive:
+                    - The current scene as a JSON object
+                    - a collage containing THREE images of the same scene:
+                        1. PERSPECTIVE VIEW: General context.
+                        2. TOP-DOWN VIEW: Best for X, Y coordinates and checking if objects are side-by-side.
+                        3. SIDE VIEW: Best for Z coordinate (height) to check if objects are floating or clipping into the floor.
 
-        print(f"JSON mis à jour: {items}")
+                RULES:
+                    - ONLY output the JSON object, nothing else
+                    - NO markdown, NO backticks, NO explanations before or after
+                    - Always use double quotes for keys and strings
+                    - Keep the same "id" and "urdf" values as the input JSON
+                    - Keep the same number of objects as the input JSON, do not add or remove objects
+                    - Only change "pos" values to fix the scene
+                    - DO NOT change 'id', 'urdf', or 'path'.
+                    - If valid is true, new_scene can be identical to the input
+                    - ALWAYS include the "new_scene" field, even if the scene is valid
+                    - There should NOT be ANY collisions
+                    - If objects overlap, 'valid' is FALSE.
+                        
+                You MUST respond with ONLY a valid JSON object, exactly in this format:
+                    {
+                        "valid": true,
+                        "feedback": "scene is correct",
+                        "new_scene": {
+                            "objets": [
+                                {"id": "mug", "urdf": "mug.urdf", "path": "", "pos": [0.0, 0.5, 0.3], "quat": [0.0, 0.0, 0.0, 1.0]},
+                                {"id": "table", "urdf": "table.urdf", "path": "", "pos": [0.0, 0.0, 0.0], "quat": [0.0, 0.0, 0.0, 1.0]}
+                            ]
+                        }
+                    }
+                """
+
+    resultat1 = ollama.chat(model="llama3.2-vision", messages=[{'role': 'system', 'content': prompt1},
+                {'role': 'user','content': f"Check and correct collisions for {json.dumps(jsonFile)}",'images': [image_path]}])
+    clean = clean_reponse(resultat1['message']['content'])
+    resultat1 = json.loads(clean)
+    if not resultat1.get('valid'):
+        return resultat1
     
-    return resultat_validation
+
+    #semantique
+    prompt2 = """ Your role is to verify if the generated scene matches the prompt. If it doesn't, correct the json file descibing the scene so it matches the prompt.
+
+                You will receive:
+                    - The current scene as a JSON object
+                    - 
+                    - a collage containing THREE images of the same scene:
+                        1. PERSPECTIVE VIEW: General context.
+                        2. TOP-DOWN VIEW: Best for X, Y coordinates and checking if objects are side-by-side.
+                        3. SIDE VIEW: Best for Z coordinate (height) to check if objects are floating or clipping into the floor.
+
+                RULES:
+                    - ONLY output the JSON object, nothing else
+                    - NO markdown, NO backticks, NO explanations before or after
+                    - Always use double quotes for keys and strings
+                    - Keep the same "id" and "urdf" values as the input JSON
+                    - Keep the same number of objects as the input JSON, do not add or remove objects
+                    - Only change "pos" values to fix the scene so it matches the prompt.
+                    - DO NOT change 'id', 'urdf', or 'path'.
+                    - If valid is true, new_scene can be identical to the input
+                    - ALWAYS include the "new_scene" field, even if the scene is valid.
+                    - If the generated scene doesn't match the prompt, 'valid' is FALSE.
+
+                You MUST respond with ONLY a valid JSON object, exactly in this format:
+                    {
+                        "valid": true,
+                        "feedback": "scene is correct",
+                        "new_scene": {
+                            "objets": [
+                                {"id": "mug", "urdf": "mug.urdf", "path": "", "pos": [0.0, 0.5, 0.3], "quat": [0.0, 0.0, 0.0, 1.0]},
+                                {"id": "table", "urdf": "table.urdf", "path": "", "pos": [0.0, 0.0, 0.0], "quat": [0.0, 0.0, 0.0, 1.0]}
+                            ]
+                        }
+                    }
+                """
+
+    resultat2 = ollama.chat(model="llama3.2-vision", messages=[{'role': 'system', 'content': prompt2},
+                {'role': 'user','content': f"Check and correct if the generated scene {json.dumps(jsonFile)} is accurate to the prompt {original_prompt}.",'images': [image_path]}])
+    clean = clean_reponse(resultat2['message']['content'])
+    resultat2 = json.loads(clean)
+    if not resultat2.get('valid'):
+        return resultat2
