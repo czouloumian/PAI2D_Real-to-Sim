@@ -1,0 +1,10 @@
+.DS_Store
+__pycache__/
+*.pyc
+objets/
+*.obj
+*.stl
+*.ply
+*.dae
+*.png
+*.jpg

@@ -3,3 +3,11 @@
 - update le bouton envoyer pour avoir un fils de discussion
 - place une poubelle sur une table
 Erreur inattendue : name 'objets_reconnus' is not defined -> doit rendre un objet n'est pas sur la liste et propose un remplacement ou la suppression de l'objets
+- verifier le planning 
+- plan d'experience 
+-tester avec/sans les primitives 
+
+
+- creer une liste d'exemple pour finetuner automatiquement un petit model 
+    - generee la scene, utilisé VLM pour dire si c valide ou pas, si valide enregistre prompt et VLM comme exemple 
+    - essayer d'en avoir 500

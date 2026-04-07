@@ -1,5 +1,4 @@
 import os
-import xml.etree.ElementTree as ET
 import random
 from itemSpec import getOriginalDimensions, getFilePath
 from jsonParsing import simplifyRelations
@@ -21,7 +20,8 @@ def initPosAndQuat(items):
     :return: les items mais avec des positions et orientations de base.
     '''
     for item in items:
-        item = getOriginalDimensions(item)
+        if not item.get('dimensions'):
+            item = getOriginalDimensions(item)
         (_, _, height) = item['dimensions']
         item['pos'] = (0,0,0.01 + height/2) #height/2 car les items sont placés par leur centre 
         item['quat'] = (0,0,0,1) #pas de rotation
@@ -41,8 +41,14 @@ def getRoot(items):
         if item.get('root') is True:
             placed_items.add(item['id'])
 
+    # fallback : si aucun root explicite, utiliser le premier item
+    if not placed_items and items:
+        print(f"[sceneBuilding] Aucun root explicite, fallback sur '{items[0]['id']}'")
+        items[0]['root'] = True
+        placed_items.add(items[0]['id'])
+
     if not placed_items:
-        raise ValueError("Aucun objets trouvés smh")
+        raise ValueError("Aucun objet à placer")
 
     return placed_items
 
@@ -53,10 +59,12 @@ def changePosFromRel(rel, item, subject):
 
     '''
     processed = True
-    item = getOriginalDimensions(item) #TODO maybe will call a diff function once we figure out the scale thing
+    if not item.get('dimensions'):
+        item = getOriginalDimensions(item)
     (width, depth, height) = item['dimensions']
     (x,y,z) = item['pos']
-    subject = getOriginalDimensions(subject)
+    if not subject.get('dimensions'):
+        subject = getOriginalDimensions(subject)
     (subject_w, subject_d, subject_h) = subject['dimensions']
     (subject_x, subject_y, subject_z) = subject['pos']
     if rel['type'] == 'on':
@@ -115,15 +123,18 @@ def processRelations(items, relations):
     items = initPosAndQuat(items)
     placed_items = getRoot(items)
     
-    #relations = simplifyRelations(relations)
+    relations = simplifyRelations(relations)
 
-    reste = relations.copy() #les relations non effectuées
+    # filtrer les relations dont les IDs n'existent pas dans les items (sécurité)
+    reste = [rel for rel in relations
+             if rel.get('object', '') in items_dict and rel.get('subject', '') in items_dict]
+
     while reste:
         progression = False
         for rel in reste[:]:
-            item_id = rel['object'] #l'objet comparé au sujet, mais c'est dangereux d'utiliser object en python vu que ça existe déjà
+            item_id = rel['object']
             subject_id = rel['subject']
-            item = items_dict[item_id] #TODO: maybe utiliser une autre nom que item dans ce contexte et seulement ce contexte
+            item = items_dict[item_id]
             subject = items_dict[subject_id]
             if item_id not in placed_items:
                 continue
@@ -133,7 +144,8 @@ def processRelations(items, relations):
                 reste.remove(rel)
                 progression = True
         if not progression:
-            raise ValueError(f"Impossible de placer les relations restantes : {reste}")
+            print(f"[sceneBuilding] Relations impossibles à résoudre, ignorées : {reste}")
+            break
     return items
 
 

@@ -1,0 +1,48 @@
+[
+  {
+    "id": "poubelle",
+    "urdf": "10357_poubelle",
+    "dimensions": [
+      1.1516,
+      1.7345,
+      1.1516
+    ],
+    "root": false,
+    "path": "/Users/anaisazouaoui/Desktop/PAI2D/projet Real-to-Sim/PAI2D_Real-to-Sim/src/../objets/10357_poubelle/mobility.urdf",
+    "pos": [
+      0.014952358024041462,
+      -0.03724364444497344,
+      1.5926
+    ],
+    "quat": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "scale": 1.0
+  },
+  {
+    "id": "lave linge",
+    "urdf": "11826_lave_linge",
+    "dimensions": [
+      1.1075,
+      1.5321,
+      0.9968
+    ],
+    "root": true,
+    "path": "/Users/anaisazouaoui/Desktop/PAI2D/projet Real-to-Sim/PAI2D_Real-to-Sim/src/../objets/11826_lave_linge/mobility.urdf",
+    "pos": [
+      0,
+      0,
+      0.5084
+    ],
+    "quat": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "scale": 1.0
+  }
+]

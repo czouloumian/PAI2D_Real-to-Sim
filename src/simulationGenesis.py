@@ -19,10 +19,11 @@ def create_scene(objetsList):
         entity = scene.add_entity(
             gs.morphs.URDF(
                 file=obj['path'],
-                pos=obj['pos'],
-                scale=1.0,
+                pos=obj['pos'], 
+                quat=obj.get('quat', [0.0, 1.0, 1.0,0.0]),
+                scale=obj.get('scale', 1.0),
             ),
-           # material=gs.materials.Rigid(rho=1000) #pour essayer de regler le pb d'objets pas solides
+            material=gs.materials.Rigid(rho=1000),
         )
 
     scene.build()
