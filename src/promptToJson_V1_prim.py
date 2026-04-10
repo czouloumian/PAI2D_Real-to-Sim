@@ -8,7 +8,7 @@ import re
 VALID_RELATION_TYPES = {"on", "under", "left_of", "right_of", "in_front_of", "behind", "facing", "against", "inside"}
 
 
-def _normalize(s):
+def normalize(s):
   """Normalise un ID pour le matching flou : minuscules, espaces/tirets/_"""
   s = s.lower().strip()
   s = re.sub(r'[-_\s]+', ' ', s)
@@ -20,15 +20,15 @@ def fuzzy_match(raw_id, valid_ids):
   if raw_id in valid_ids:
     return raw_id
 
-  norm_raw = _normalize(raw_id)
+  norm_raw = normalize(raw_id)
   # "lave-linge" == "lave linge" normalisation
   for vid in valid_ids:
-    if _normalize(vid) == norm_raw:
+    if normalize(vid) == norm_raw:
       return vid
 
-  # le LLM a peut-être ajoute/retire des mots)
+  # le LLM a peut-etre ajoute/retire des mots cet idiot 
   for vid in valid_ids:
-    nv = _normalize(vid)
+    nv = normalize(vid)
     if nv in norm_raw or norm_raw in nv:
       return vid
 

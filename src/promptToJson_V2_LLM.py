@@ -1,5 +1,5 @@
 import json
-from promptToJson_auxilieres import objets_list, _objects_desc, validate_json_response, validate_matches, URL, OBJETS_DIR, object_rec
+from promptToJson_auxilieres import objets_list, objects_desc, validate_json_response, validate_matches, URL, OBJETS_DIR, object_rec
 
 #--------------------------
 # prompt textuel 
@@ -19,7 +19,7 @@ def object_dim_quat(prompt, objet_reconnus):
       }
   """
   
-  objects_desc = _objects_desc()
+  objects_desc = objects_desc()
 
   system_prompt = f"""You are a strict JSON API. You place 3D objects in a simulation scene.
   All dimensions are in meters. The floor is at z = 0.
@@ -69,7 +69,7 @@ def object_dim_quat(prompt, objet_reconnus):
 #-------modifier la scene
 def modify_scene(prompt, current_objects_json, objet_reconnus):
   """Modifie une scene existante selon le prompt utilisateur."""
-  catalog_desc = _objects_desc()
+  catalog_desc = objects_desc()
 
   objects_info = "\n".join(
     f'- id: "{id_}" | urdf: "{info["urdf"]}" | dimensions: {info["dimensions"]} m'

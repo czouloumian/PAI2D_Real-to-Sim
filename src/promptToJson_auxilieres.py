@@ -44,7 +44,7 @@ def objets_list(dirpath=OBJETS_DIR):
 
 
 @functools.lru_cache(maxsize=1)
-def _objects_desc(dirpath=OBJETS_DIR):
+def objects_desc(dirpath=OBJETS_DIR):
   """chaine de description du catalogue — cache pour pas refaire le calcule"""
   objects_data = objets_list(dirpath)
   return "\n".join(
@@ -149,7 +149,7 @@ def object_rec(prompt=None):
   
   objects_data = objets_list()  
   valid_urdfs = set(objects_data.keys())
-  objects_desc = _objects_desc()  
+  objects_desc = objects_desc()  
   
   #print(objects_desc)
   
@@ -262,7 +262,7 @@ def classify_intent(prompt, scene_summary):
 
 def suggest_alternatives(label):
   """Propose 2-3 objets du catalogue les plus proches du label non reconnu"""
-  catalog_desc = _objects_desc()
+  catalog_desc = objects_desc()
   objects_data = objets_list()
 
   system_prompt = f"""You suggest the closest alternatives from a 3D object catalogue for an unrecognized object.
