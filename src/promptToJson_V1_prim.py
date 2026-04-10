@@ -5,7 +5,7 @@ import re
 # RECONNAITRE LES RELATIONS ENTRE OBJETS
 #---------------------------------------------------------------------
 
-VALID_RELATION_TYPES = {"on", "under", "left_of", "right_of", "in_front_of", "behind", "facing"}
+VALID_RELATION_TYPES = {"on", "under", "left_of", "right_of", "in_front_of", "behind", "facing", "against", "inside"}
 
 
 def _normalize(s):
@@ -109,6 +109,8 @@ def object_relations(prompt=None, objets_rec=None):
         - "in_front_of" : A is in front of B               (e.g. "a chair in front of a desk")
         - "behind"      : A is behind B                    (e.g. "a plant behind the sofa")
         - "facing"      : A and B face each other          (e.g. "two sofas facing each other")
+        - "inside"      : A is inside B                    (e.g. "a book inside the drawer")
+        - "against"     : A is against B                   (e.g. "a lamp against the wall")
 
         OUTPUT FORMAT — return ONLY this JSON:
         {{

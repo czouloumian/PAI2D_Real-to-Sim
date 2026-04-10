@@ -15,11 +15,14 @@ SRC_DIR = os.path.dirname(os.path.abspath(__file__))
 SCENE_OUTPUT_FILE = os.path.join(SRC_DIR, '..', 'scene_generee.json')
 
 
-def _place_objects(prompt, objet_reconnus):
+def _place_objects(prompt, objet_reconnus, relations_corrigees=None):
     """Place les objets selon la version du pipeline choisie."""
     if PIPELINE_VERSION == "V1":
-
-        relations_data = object_relations(prompt, objet_reconnus)
+        if relations_corrigees is not None:
+            relations_data = relations_corrigees
+        else:
+            relations_data = object_relations(prompt, objet_reconnus)
+            
         root_id = relations_data.get("root", "")
         relations = relations_data.get("relations", [])
 

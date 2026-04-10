@@ -1,6 +1,5 @@
 import genesis as gs
 
-
 def create_scene(objetsList):
     '''
     Fonction qui permet de creer la scene sur genesis à partir des infos objenues précédemment.
@@ -12,7 +11,7 @@ def create_scene(objetsList):
 
     scene = gs.Scene(show_viewer=True)
 
-    plane = scene.add_entity(gs.morphs.Plane()) #la ground plaine
+    plane = scene.add_entity(gs.morphs.Plane())
 
     #ajout des objets: une boucle for qui prend l'objet, sa position, son filepath, et qui crée les objets un par un
     for obj in objetsList:
@@ -20,7 +19,7 @@ def create_scene(objetsList):
             gs.morphs.URDF(
                 file=obj['path'],
                 pos=obj['pos'], 
-                quat=obj.get('quat', [0.0, 1.0, 1.0,0.0]),
+                quat=obj.get('quat', [0.0, 1.0, 1.0, 0.0]),
                 scale=obj.get('scale', 1.0),
             ),
             material=gs.materials.Rigid(rho=1000),

@@ -3,7 +3,6 @@ import os
 from simulationGenesis import create_scene
 from sceneBuilding import buildScene
 from jsonParsing import readJSON
-from promptToJson import instruction_to_json
 
 def main():
     #print("Décrivez la scène de simulation désirée:")

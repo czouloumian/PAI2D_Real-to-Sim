@@ -101,7 +101,7 @@ class MainWindow(QMainWindow):
         panel.setFrameShape(QFrame.Shape.StyledPanel)
         layout = QVBoxLayout(panel)
         layout.setSpacing(6)
-        label = QLabel("Apercue 3D de la scene")
+        label = QLabel("Aperçu 3D de la scene")
         label.setFont(QFont("Arial", 11, QFont.Weight.Bold))
         layout.addWidget(label)
 

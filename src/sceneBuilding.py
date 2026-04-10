@@ -71,12 +71,10 @@ def changePosFromRel(rel, item, subject):
         subject_x += random.uniform(x - width/2 + subject_w/2, x + width/2 - subject_w/2) #prise en compte des dims du sujet pour ne pas etre trop au bord
         subject_y += random.uniform(y - depth/2 + subject_d/2, y + depth/2 - subject_d/2)
         subject_z += z + height/2
-    #TODO: pour les elifs suivants: changer le x ou y aussi avec random en fonction des dimensions de l'item?
-    #TODO: rendre ce code plus efficace et modulable
-    elif rel['type'] == 'in_front_of': #TODO: deal avec les choses qui dépassent des dimensions comme la poignée
+    elif rel['type'] == 'in_front_of':
         subject_x += random.uniform(x + width/2 + subject_w/2, x + width + subject_w/2)
         subject_z = z
-    elif rel['type'] == 'behind': # TODO: pb: la handle du mug. on laisse à la validation vlm et les quaternions ou pas? 
+    elif rel['type'] == 'behind':
         #subject_x += random.uniform(x - width/2 - subject_w/2, x - width - subject_w/2)
         subject_x += random.uniform(x - width/2 - subject_w , x - width - subject_w/2) #temp fix
         subject_z = z
@@ -86,21 +84,25 @@ def changePosFromRel(rel, item, subject):
     elif rel['type'] == 'left_of':
         subject_y += random.uniform(y - depth/2 - subject_d/2, y - depth - subject_d/2)
         subject_z = z
-    elif rel['type'] == 'against': #TODO
-        pass
+    elif rel['type'] == 'against':
+        subject_x = x + width/2 + subject_w/2 + 0.01
+        subject_y = y
+        subject_z = z
+    elif rel['type'] == 'inside':
+        subject_x = x
+        subject_y = y
+        subject_z = z 
+    elif rel['type'] == 'facing':
+        subject_x = x + width/2 + subject_w/2 + random.uniform(0.1, 0.4)
+        subject_y = y
+        subject_z = z
+        qx, qy, qz, qw = subject.get('quat', [0, 0, 0, 1])
+        new_quat = [-qy, qx, qw, -qz] 
+        subject['quat'] = new_quat
     else:
-        pass #TODO: throw an error 
-
+        print("relation non traitée: ", rel['type'])
     subject['pos'] = (subject_x, subject_y, subject_z)
     
-
-def changeQuatFromRel():
-    '''
-    Change l'orientation de l'item en fonction de la relation et du sujet
-    '''
-    #TODO, et aussi se poser la question de si l'orientation de both le sujet et l'item doivent etre changées, dans le cas de 'facing' par exemple
-    pass
-
 
 def verifyRelations(): #TODO: classer en pos et quaternions possiblement?
     '''
