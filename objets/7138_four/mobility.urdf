@@ -212,7 +212,7 @@
 		<visual name="control_button-5">
 			<origin xyz="0 0 0"/>
 			<geometry>
-				<mesh filename="textured_objs/new-8.obj"/>
+				<mesh filename="textured_objs/original-8.obj"/>
 			</geometry>
 		</visual>
 		<visual name="control_button-6">
@@ -296,7 +296,7 @@
 		<collision>
 			<origin xyz="0 0 0"/>
 			<geometry>
-				<mesh filename="textured_objs/new-8.obj"/>
+				<mesh filename="textured_objs/original-8.obj"/>
 			</geometry>
 		</collision>
 		<collision>
