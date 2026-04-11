@@ -6,9 +6,9 @@
             "path": "/home/invite/PAI2D_Real-to-Sim/src/version2/../../objets/ycb_mug.urdf",
             "scale": 0.26,
             "pos": [
-                0.5,
-                0.5,
-                0.0
+                0.0,
+                0.0,
+                0.051
             ],
             "quat": [
                 0,
@@ -23,14 +23,14 @@
             ]
         },
         {
-            "id": "drawer",
-            "urdf": "drawer.urdf",
-            "path": "/home/invite/PAI2D_Real-to-Sim/src/version2/../../objets/drawer.urdf",
+            "id": "banana",
+            "urdf": "model.urdf",
+            "path": "/home/invite/PAI2D_Real-to-Sim/src/version2/../../objets/011_banana/google_16k/model.urdf",
             "scale": 0.26,
             "pos": [
                 0.0,
                 0.0,
-                0.0
+                0.35
             ],
             "quat": [
                 0,
@@ -39,9 +39,53 @@
                 1
             ],
             "dimensions": [
-                0.006,
-                0.19,
-                0.113136
+                0.19223400000000002,
+                0.07983799999999999,
+                0.039513
+            ]
+        },
+        {
+            "id": "scissors",
+            "urdf": "model.urdf",
+            "path": "/home/invite/PAI2D_Real-to-Sim/src/version2/../../objets/037_scissors/google_16k/model.urdf",
+            "scale": 0.26,
+            "pos": [
+                0.0,
+                0.0,
+                0.35
+            ],
+            "quat": [
+                0,
+                0,
+                0,
+                1
+            ],
+            "dimensions": [
+                0.20482499999999998,
+                0.088147,
+                0.020310999999999996
+            ]
+        },
+        {
+            "id": "table",
+            "urdf": "table.urdf",
+            "path": "/home/invite/PAI2D_Real-to-Sim/src/version2/../../objets/table.urdf",
+            "scale": 0.26,
+            "pos": [
+                0.0,
+                0.0,
+                0.36
+            ],
+            "quat": [
+                0,
+                0,
+                0,
+                1
+            ],
+            "dimensions": [
+                0.05,
+                0.05,
+                0.7
             ]
         }
     ]

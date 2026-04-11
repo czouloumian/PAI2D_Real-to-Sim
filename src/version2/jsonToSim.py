@@ -30,6 +30,7 @@ def create_scene(objetsList):
                 pos=obj['pos'], 
                 quat=obj.get('quat', [0.0, 1.0, 1.0, 0.0]),
                 scale=obj.get('scale', 1.0),
+                fixed=True
             ),
             material=gs.materials.Rigid(rho=1000),
         )
@@ -38,9 +39,10 @@ def create_scene(objetsList):
 
     for i in range(1000):
         scene.step()
+    gs.destroy()
 
 
-def create_scene_validation(objetsList):
+def create_scene_validation(objetsList, fixed=False):
     '''
     Fonction qui permet de creer la scene sur genesis à partir des infos objenues précédemment.
     On commence par initialiser une scène vide, puis on rajoute les objets URDF.
@@ -58,7 +60,8 @@ def create_scene_validation(objetsList):
     cameras = {
         "perspective":scene.add_camera(res=(640, 480), pos=(3.5, 0.0, 2.5), lookat=(0, 0, 0.5), fov=30),
         "top":scene.add_camera(res=(640, 480), pos=(0.0, 0.0, 4.0), lookat=(0, 0, 0),   fov=40),
-        "side":scene.add_camera(res=(640, 480), pos=(0.0, 3.5, 1.0), lookat=(0, 0, 0.5), fov=30)
+        "side":scene.add_camera(res=(640, 480), pos=(0.0, 3.5, 1.0), lookat=(0, 0, 0.5), fov=30),
+        "side2": scene.add_camera(res=(640, 480),pos=(3.5, 0.0, 0.5),lookat=(0, 0, 0.5),fov=30)
     }
 
     font = ImageFont.load_default()
@@ -69,8 +72,10 @@ def create_scene_validation(objetsList):
             gs.morphs.URDF(
                 file=obj['path'],
                 pos=tuple(obj['pos']),
-                quat=tuple(obj['quat'])
+                quat=tuple(obj['quat']),
+                fixed=fixed
             ),
+            material=gs.materials.Rigid(rho=1000)
         )
 
     scene.build()
@@ -89,7 +94,7 @@ def create_scene_validation(objetsList):
     #    image_paths.append(img_path)
 
 
-    views = ["perspective", "top", "side"]
+    views = ["perspective", "top", "side", "side2"]
     images = []
     
     for name in views:
