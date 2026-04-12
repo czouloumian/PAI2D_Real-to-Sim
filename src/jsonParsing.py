@@ -13,8 +13,9 @@ def readJSON(path):
     items = data.get('objets', [])
     relations = data.get('relations', [])
     relations = simplifyRelations(relations)
+    orientations = data.get('orientations', [])
 
-    return items, relations
+    return items, relations, orientations
 
 
 def simplifyRelations(relations):

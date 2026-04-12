@@ -1,6 +1,6 @@
 import genesis as gs
 
-def create_scene(objetsList):
+def create_scene(objetsList): #TODO: la gravité est passée où??
     '''
     Fonction qui permet de creer la scene sur genesis à partir des infos objenues précédemment.
     On commence par initialiser une scène vide, puis on rajoute les objets URDF.
