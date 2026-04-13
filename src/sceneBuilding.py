@@ -23,8 +23,9 @@ def initPosAndQuat(items):
         if not item.get('dimensions'):
             item = getOriginalDimensions(item)
         (_, _, height) = item['dimensions']
-        item['pos'] = (0,0,0.01 + height/2) #height/2 car les items sont placés par leur centre 
-        item['quat'] = (0,0,0,1) #pas de rotation
+        item['pos'] = (0,0,0.01 + height/2) #height/2 car les items sont placés par leur centre
+        if not item.get('quat'):
+            item['quat'] = (0,0,0,1) #pas de rotation
     return items
 
 
@@ -58,12 +59,9 @@ def changePosFromRel(rel, item, subject):
     Change les données de positions du sujet en fonction de la relation et de l'item déjà placé
 
     '''
-    if not item.get('dimensions'):
-        item = getOriginalDimensions(item)
+
     (width, depth, height) = item['dimensions']
     (x,y,z) = item['pos']
-    if not subject.get('dimensions'):
-        subject = getOriginalDimensions(subject)
     (subject_w, subject_d, subject_h) = subject['dimensions']
     (subject_x, subject_y, subject_z) = subject['pos']
     if rel['type'] == 'on':
@@ -104,22 +102,23 @@ def changePosFromRel(rel, item, subject):
     
 
 
-def changeQuatFromTurn(turn, item): #TODO: il va falloir changer le code pour que ça trouve turn dans le json et tout
+def changeQuatAndPosFromTurn(turn, item):
     '''
     Change les données d'orientation du sujet
     '''
-
     current = item.get('quat', [0, 0, 0, 1])
+    if not item.get('dimensions'):
+        item = getOriginalDimensions(item)
+    (width, depth, height) = item['dimensions']
     rotations = {
-        'turn_left':    [0, 0, 0.707, 0.707],# 90 autour de z
-        'turn_right':   [0, 0, -0.707, 0.707],# -90° autour de z
-        'turn_back':    [0, 0, 1, 0],# 180° autour de z
-        'tip_forward':  [0.707, 0, 0, 0.707],# 90° autour de x
-        'tip_backward': [-0.707, 0, 0, 0.707],# -90° autour de x
-        'tip_right':    [0, 0.707, 0, 0.707], # 90° autour de y
-        'tip_left':     [0, -0.707, 0, 0.707],# -90° autour de y
-        'upside_down':  [1, 0, 0, 0]# 180° autour de x
-        } #TODO: pb pour upside_down??
+        'tip_left':[0, 0, 0.707, 0.707],
+        'tip_right':[0, 0, -0.707, 0.707],
+        'upside_down': [0, 0, 1, 0],
+        'tip_forward':[0.707, 0, 0, 0.707],
+        'tip_backward':[-0.707, 0, 0, 0.707],
+        'turn_right':[0, 0.707, 0, 0.707], 
+        'turn_left': [0, -0.707, 0, 0.707],
+        'turn_around':[1, 0, 0, 0]}
     
     if turn not in rotations:
         print(f"chagement d'orientation non traité: {turn}")
@@ -131,14 +130,16 @@ def changeQuatFromTurn(turn, item): #TODO: il va falloir changer le code pour qu
     x2, y2, z2, w2 = change
     new_quat = [w1*x2 + x1*w2 + y1*z2 - z1*y2, w1*y2 - x1*z2 + y1*w2 + z1*x2, w1*z2 + x1*y2 - y1*x2 + z1*w2, w1*w2 - x1*x2 - y1*y2 - z1*z2]
     item['quat'] = new_quat
+
+    #et ensuite on change les dimensions vu que le dessus de l'objet n'et plus le meme etc...
+    if turn == 'turn_left' or turn == 'turn_right':
+        item['dimensions'] = (depth, width, height)
+    elif turn == 'tip_forward' or turn == 'tip_backward':
+        item['dimensions'] = (width, height, depth)
+    elif turn == 'tip_right' or turn == 'tip_left':
+        item['dimensions'] = (height, depth, width)
+
     return item
-
-
-def verifyRelations(): #TODO: classer en pos et quaternions possiblement?
-    '''
-    Vérifie que les relations sont valides, ne prend que les relations qui existent
-    '''
-    pass
 
 
 def processRelations(items, relations):
@@ -152,7 +153,6 @@ def processRelations(items, relations):
 
     items_dict = {item['id']: item for item in items} #pour pouvoir acceder aux differents items plus facilement
 
-    items = initPosAndQuat(items)
     placed_items = getRoot(items)
     
     relations = simplifyRelations(relations)
@@ -178,6 +178,7 @@ def processRelations(items, relations):
             break
     return items
 
+
 def processOrientations(items,orientations):
     '''
     Adapte les quaternions des items en fonctions des changements d'orientation.
@@ -186,21 +187,26 @@ def processOrientations(items,orientations):
     :param relations: les changements d'orientation
     :return: items, les items avec les bonnes orientations
     '''
-    items_dict = {item['id']: item for item in items} #pour pouvoir acceder aux differents items plus facilement   
+    items_dict = {item['id']: item for item in items} #pour pouvoir acceder aux differents items plus facilement
     for ori in orientations:
         id = ori['id']
         turn = ori['turn']
         item = items_dict[id]
-        changeQuatFromTurn(turn, item)
-
+        print(f"Avant: {id} quat={item.get('quat')}")
+        changeQuatAndPosFromTurn(turn, item)
+        print(f"Après: {id} quat={item.get('quat')}")
     return items
 
-def buildScene(items, relations, orientations): #TODO verif si autres trucs needed
+
+def buildScene(items, relations, orientations): #TODO c'est très moche comme façon de faire
     '''
     Ajoute à une liste de dictionnaires (un dict par item), toutes les infos nécessaies à la simulation, donc path et pos
     '''
     for item in items:
         item['path'] = getFilePath(item)
-    items = processRelations(items,relations)
+        if not item.get('dimensions'):
+            item = getOriginalDimensions(item)
     items = processOrientations(items,orientations)
+    items = initPosAndQuat(items)
+    items = processRelations(items,relations)
     return items
