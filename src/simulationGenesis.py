@@ -9,7 +9,7 @@ def create_scene(objetsList): #TODO: la gravité est passée où??
     '''
     gs.init(backend=gs.cpu)
 
-    scene = gs.Scene(show_viewer=True)
+    scene = gs.Scene(show_viewer=True, rigid_options=gs.options.RigidOptions(dt=0.01))
 
     plane = scene.add_entity(gs.morphs.Plane())
 
@@ -21,8 +21,9 @@ def create_scene(objetsList): #TODO: la gravité est passée où??
                 pos=obj['pos'], 
                 quat=obj.get('quat', [0.0, 1.0, 1.0, 0.0]),
                 scale=obj.get('scale', 1.0),
+                fixed = True
             ),
-            material=gs.materials.Rigid(rho=1000),
+            material=gs.materials.Rigid(rho=1000, friction=0.5)
         )
 
     scene.build()

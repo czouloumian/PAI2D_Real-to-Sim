@@ -64,23 +64,43 @@ def changePosFromRel(rel, item, subject):
     (x,y,z) = item['pos']
     (subject_w, subject_d, subject_h) = subject['dimensions']
     (subject_x, subject_y, subject_z) = subject['pos']
+
+    if rel.get('distance'):
+        distance = rel['distance']
+        isDistance = True
+
     if rel['type'] == 'on':
         subject_x += random.uniform(x - width/2 + subject_w/2, x + width/2 - subject_w/2) #prise en compte des dims du sujet pour ne pas etre trop au bord
         subject_y += random.uniform(y - depth/2 + subject_d/2, y + depth/2 - subject_d/2)
         subject_z += z + height/2
     elif rel['type'] == 'in_front_of':
-        subject_x += random.uniform(x + width/2 + subject_w/2, x + width + subject_w/2)
-        subject_z = z
+        if isDistance:
+            subject_x += x + width/2 + subject_w/2 + distance
+            subject_z = z
+        else:
+            subject_x += random.uniform(x + width/2 + subject_w/2, x + width + subject_w/2)
+            subject_z = z
     elif rel['type'] == 'behind':
-        #subject_x += random.uniform(x - width/2 - subject_w/2, x - width - subject_w/2)
-        subject_x += random.uniform(x - width/2 - subject_w , x - width - subject_w/2) #temp fix
-        subject_z = z
-    elif rel['type'] == 'right_of':
-        subject_y += random.uniform(y + depth/2 + subject_d/2, y + depth + subject_d/2)
-        subject_z = z
+        if isDistance:
+            subject_x += x - width/2 - subject_w - distance
+            subject_z = z
+        else:
+            subject_x += random.uniform(x - width/2 - subject_w , x - width - subject_w/2) #temp fix
+            subject_z = z
+    elif rel['type'] == 'right_of': 
+        if isDistance:
+            subject_y += y + depth/2 + subject_d/2 + distance
+            subject_z = z
+        else:
+            subject_y += random.uniform(y + depth/2 + subject_d/2, y + depth + subject_d/2)
+            subject_z = z
     elif rel['type'] == 'left_of':
-        subject_y += random.uniform(y - depth/2 - subject_d/2, y - depth - subject_d/2)
-        subject_z = z
+        if isDistance:
+            subject_y += y - depth/2 - subject_d/2 - distance
+            subject_z = z
+        else:
+            subject_y += random.uniform(y - depth/2 - subject_d/2, y - depth - subject_d/2)
+            subject_z = z
     elif rel['type'] == 'against':
         subject_x = x + width/2 + subject_w/2 + 0.01
         subject_y = y
@@ -90,7 +110,10 @@ def changePosFromRel(rel, item, subject):
         subject_y = y
         subject_z = z 
     elif rel['type'] == 'facing':
-        subject_x = x + width/2 + subject_w/2 + random.uniform(0.1, 0.4)
+        if isDistance:
+            subject_x = x + width/2 + subject_w/2 + distance
+        else:
+            subject_x = x + width/2 + subject_w/2 + random.uniform(0.1, 0.4)
         subject_y = y
         subject_z = z
         qx, qy, qz, qw = subject.get('quat', [0, 0, 0, 1])
@@ -164,6 +187,10 @@ def processRelations(items, relations):
         for rel in reste[:]:
             item_id = rel['object']
             subject_id = rel['subject']
+            if item_id not in items_dict:
+                print(f"ATTENTION: ID objet inconnu dans relation: '{item_id}'")
+            if subject_id not in items_dict:
+                print(f"ATTENTION: ID objet inconnu dans relation: '{subject_id}'")
             item = items_dict[item_id]
             subject = items_dict[subject_id]
             if item_id not in placed_items:
