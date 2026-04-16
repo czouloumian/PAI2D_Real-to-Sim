@@ -11,3 +11,5 @@ Erreur inattendue : name 'objets_reconnus' is not defined -> doit rendre un obje
 - creer une liste d'exemple pour finetuner automatiquement un petit model 
     - generee la scene, utilisé VLM pour dire si c valide ou pas, si valide enregistre prompt et VLM comme exemple 
     - essayer d'en avoir 500
+
+
