@@ -13,3 +13,43 @@ Erreur inattendue : name 'objets_reconnus' is not defined -> doit rendre un obje
     - essayer d'en avoir 500
 
 
+- intro qui pose le probleme : pk la question est interessante 
+- etat de l'art ? est ce que c'est necessaire -> pas approprie citer les travaux correpondant
+- methode : on decrit ce qu'on a fait 
+- resultat : setup experimental -> comment on a teser, quel environnment, combien d'nevironment, parametre 
+            resultat obtenu des test, tracés de courbes 
+- discussion : qu'est ce qu'il reste a faire et cec qu'on a pas encore fait 
+- conclusion : resume du message qu'on voulait faire passe
+
+- variante à la fin avec resultats -> quel message on veut faire passer par rapport a cette methode 
+-> parler des hallucination 
+
+-> trouver un sens a ce qu'on dit et une ligen directrice -> savoir ou on veut amener le lecteur 
+-> avoir les resultats avant d'ecrire 
+-> comparer gros et petit model
+
+
+prootocol:
+
+objectif : donnee pour experience futur 
+-> quelles donnees et pk on les veut 
+-> la quesiton a laquelle on veut repondre : projection 3D fonctionne ou pas ? 
+
+--> avec ca quelles données on veut recuperer : quel type d'image, quels info on veut, est ce qu'on veut annoter les objets à la main, dpnner de profondeur, rgb 
+
+- il faudrait tester avec des objets disponibles dont la bibliotheque
+- placer des objets a divers depth 
+- on, under, inside - empilage des objets 
+- differente rotation 
+- plusieurs point de vue d'une meme image
+- distance entre les objets 
+
+
+methode de test :
+    - test de base avec differents objets et orientations et depth juste poser sans relation
+    - certaines images plus complexe avec relation, ligne d'objet, objet dessus, objets qui entourent un autre 
+    - differente taille d'objets 
+    - objet partiellement visibles (objets derrieres)
+    - bazar d'objets -> hyper complexe
+    - 
+

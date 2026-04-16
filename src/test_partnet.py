@@ -41,7 +41,7 @@ def main():
                  "44817_meuble_tiroirs/mobility.urdf","100073_cle_usb/mobility.urdf", 
                  "100658_boite_carton_ouverte/mobility.urdf", "103369_lave_vaisselle/mobility.urdf",
                  "103477_toaster/mobility.urdf"]
-    for filename in liste_partnet:
+    for filename in liste_partnet_marche_pas:
         items_folder = os.path.join(os.path.dirname(__file__),'..', 'objets')
         path = os.path.join(items_folder, filename)
         create_scene(path)
