@@ -19,15 +19,22 @@ SCENE_DEPTH = 5.0
 VERTICAL_RELATIONS = {"on", "under", "inside"}
 RE_SUFFIX = re.compile(r'_\d+$')   
 
+MAX_IMAGE_SIZE = 640   # px sur le côté le plus long — réduit le temps de l'encodeur vision
+
 def load_images(image_sources):
     """
-    Charge les images, convertit en RGB (supprime le canal alpha si RGBA)
+    Charge les images, convertit en RGB (supprime le canal alpha si RGBA),
+    redimensionne à MAX_IMAGE_SIZE pour accélérer l'encodeur vision.
     """
     images = []
     for source in image_sources:
         img = Image.open(str(source))
         if img.mode != "RGB":
             img = img.convert("RGB")
+        w, h = img.size
+        if max(w, h) > MAX_IMAGE_SIZE:
+            scale = MAX_IMAGE_SIZE / max(w, h)
+            img = img.resize((int(w * scale), int(h * scale)), Image.LANCZOS)
         buf = io.BytesIO()
         img.save(buf, format="PNG")
         images.append(base64.b64encode(buf.getvalue()).decode("utf-8"))
@@ -37,25 +44,36 @@ def load_images(image_sources):
 
 def call_vision_llm(images_b64, system_prompt, user_prompt):
     """
-    Appel llama3.2-vision via Ollama avec timeout étendu.
+    Appel llama3.2-vision via Ollama en mode streaming.
+    Le streaming maintient la connexion active token par token,
+    évitant le read-timeout qui survenait avec stream=False.
     """
     payload = {
         "model": "llama3.2-vision",
         "system": system_prompt,
         "prompt": user_prompt,
         "images": images_b64,
-        "stream": False,
+        "stream": True,
         "options": {"temperature": 0, "num_predict": 512}
     }
-    print("[call_vision_llm] Envoi requête à Ollama...")
-    response = requests.post(URL, json=payload, timeout=VISION_TIMEOUT)
+    print("[call_vision_llm] Envoi requête à Ollama (streaming)...")
+    response = requests.post(URL, json=payload, stream=True, timeout=VISION_TIMEOUT)
     if response.status_code != 200:
         raise RuntimeError(f"Erreur Ollama vision (HTTP {response.status_code}): {response.text}")
-    raw = response.json().get("response", "")
-    match = _RE_JSON.search(raw)
-    if not match:
-        raise ValueError(f"VLM n'a pas retourné de JSON valide. Réponse brute : {raw[:200]}")
+
+    full_response = ""
+    for line in response.iter_lines():
+        if not line:
+            continue
+        chunk = json.loads(line)
+        full_response += chunk.get("response", "")
+        if chunk.get("done"):
+            break
+
     print("[call_vision_llm] Réponse reçue.")
+    match = _RE_JSON.search(full_response)
+    if not match:
+        raise ValueError(f"VLM n'a pas retourné de JSON valide. Réponse brute : {full_response[:200]}")
     return json.loads(match.group())
 
 
