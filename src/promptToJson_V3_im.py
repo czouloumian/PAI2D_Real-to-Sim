@@ -1,7 +1,9 @@
 import base64
+import io
 import re
 import requests
 from collections import defaultdict
+from PIL import Image
 from promptToJson_auxilieres import validate_json_response, object_rec
 from sceneBuilding import initPosAndQuat, processRelations, processOrientations
 
@@ -14,23 +16,38 @@ VERTICAL_RELATIONS = {"on", "under", "inside"}
 RE_SUFFIX = re.compile(r'_\d+$')   
 
 def load_images(image_sources):
+    """
+    Charge les images, convertit en RGB (supprime le canal alpha si RGBA)
+    """
     images = []
     for source in image_sources:
-        with open(str(source), "rb") as f:
-            images.append(base64.b64encode(f.read()).decode("utf-8"))
+        img = Image.open(str(source))
+        if img.mode != "RGB":
+            img = img.convert("RGB")
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        images.append(base64.b64encode(buf.getvalue()).decode("utf-8"))
+        print(f"[load_images] {source} → {img.size} RGB")
     return images
 
+
 def call_vision_llm(images_b64, system_prompt, user_prompt):
+    """
+    Appel llama3.2-vision via Ollama
+    Pas de "format":"json" non supporte par VLM askip
+    """
     payload = {
         "model": "llama3.2-vision",
         "system": system_prompt,
         "prompt": user_prompt,
         "images": images_b64,
         "stream": False,
-        "format": "json",
         "options": {"temperature": 0}
     }
-    return validate_json_response(payload)
+    print("[call_vision_llm] Envoi requête à Ollama...")
+    result = validate_json_response(payload)
+    print("[call_vision_llm] Réponse reçue.")
+    return result
 
 
 # ─────────────────────────────────────────────────────────────────────────────
