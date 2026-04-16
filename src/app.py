@@ -453,7 +453,7 @@ class MainWindow(QMainWindow):
                 self._append_message(f"Erreur : {html.escape(str(e))}", "error")
 
     def _on_launch_genesis(self):
-        """Lance genesis dans une autre fenetre"""
+        """Lance genesisdans une autre fenetre"""
         if self._current_objetsList is None:
             return
         launcher = os.path.join(SRC_DIR, "launch_genesis.py")

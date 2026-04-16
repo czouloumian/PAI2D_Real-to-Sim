@@ -115,7 +115,7 @@ def validate_matches(result, objects_data):
 
   raw_verdicts = validate_json_response(payload).get("verdicts", [])
   
-  # normaliser : le LLM retourne parfois un bool au lieu d'une liste
+  # normaliser : le LLM retourne deds fois un bool au lieu d'une liste
   if isinstance(raw_verdicts, bool):
     verdicts = [raw_verdicts]
   elif isinstance(raw_verdicts, list):
@@ -149,17 +149,17 @@ def object_rec(prompt=None):
   
   objects_data = objets_list()  
   valid_urdfs = set(objects_data.keys())
-  objects_desc = objects_desc()  
-  
-  #print(objects_desc)
-  
+  catalogue_desc = objects_desc()
+
+  print("[OBJETS DU CATALOGUE]",catalogue_desc)
+
   if not prompt:
     return {}, []
 
   system_prompt = f"""You are a strict JSON API that matches objects from a scene description to a fixed catalogue of 3D models.
 
         CATALOGUE — the ONLY valid "urdf" values:
-        {objects_desc}
+        {catalogue_desc}
 
         EXAMPLES:
         Input: "un frigo et une machine à laver côte à côte"
@@ -173,7 +173,7 @@ def object_rec(prompt=None):
 
         Input: "une baignoire à côté d'un lave-linge"
         Output: {{"objets_non_reconnus": ["baignoire"], "obj_reconnus": {{"lave-linge": "11826_lave_linge"}}}}
-        IMPORTANT: "baignoire" does NOT exist in the catalogue — it must go in objets_non_reconnus, NOT be mapped to an unrelated object.
+        IMPORTANT: if "baignoire" does NOT exist in the catalogue — it must go in objets_non_reconnus, NOT be mapped to an unrelated object.
 
         OUTPUT FORMAT — return ONLY this JSON:
         {{

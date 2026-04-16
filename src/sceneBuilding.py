@@ -23,8 +23,9 @@ def initPosAndQuat(items):
         if not item.get('dimensions'):
             item = getOriginalDimensions(item)
         (_, _, height) = item['dimensions']
-        item['pos'] = (0,0,0.01 + height/2) #height/2 car les items sont placés par leur centre 
-        item['quat'] = (0,0,0,1) #pas de rotation
+        s = item.get('scale', 1.0)
+        item['pos'] = (0, 0, 0.01 + height * s / 2)
+        item['quat'] = (0,0,0,1)
     return items
 
 
@@ -61,11 +62,13 @@ def changePosFromRel(rel, item, subject):
     processed = True
     if not item.get('dimensions'):
         item = getOriginalDimensions(item)
-    (width, depth, height) = item['dimensions']
+    s_item = item.get('scale', 1.0)
+    width, depth, height = [d * s_item for d in item['dimensions']]
     (x,y,z) = item['pos']
     if not subject.get('dimensions'):
         subject = getOriginalDimensions(subject)
-    (subject_w, subject_d, subject_h) = subject['dimensions']
+    s_sub = subject.get('scale', 1.0)
+    subject_w, subject_d, subject_h = [d * s_sub for d in subject['dimensions']]
     (subject_x, subject_y, subject_z) = subject['pos']
     if rel['type'] == 'on':
         subject_x += random.uniform(x - width/2 + subject_w/2, x + width/2 - subject_w/2) #prise en compte des dims du sujet pour ne pas etre trop au bord

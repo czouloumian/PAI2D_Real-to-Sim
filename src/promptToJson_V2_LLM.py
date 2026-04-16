@@ -19,13 +19,13 @@ def object_dim_quat(prompt, objet_reconnus):
       }
   """
   
-  objects_desc = objects_desc()
+  catalogue_desc = objects_desc()
 
   system_prompt = f"""You are a strict JSON API. You place 3D objects in a simulation scene.
   All dimensions are in meters. The floor is at z = 0.
 
   OBJECTS TO PLACE:
-  {objects_desc}
+  {catalogue_desc}
 
   OUTPUT FORMAT — return ONLY this JSON object:
   {{

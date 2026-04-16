@@ -5,7 +5,7 @@ import traceback
 from PyQt6.QtCore import QObject, pyqtSignal
 from promptToJson_auxilieres import object_rec, objets_list, suggest_alternatives,classify_intent, OBJETS_DIR
 from promptToJson_V2_LLM import object_dim_quat, modify_scene
-from promptToJson_V1_prim import object_relations
+from promptToJson_V1_prim import object_relations, scale, final_json
 from sceneBuilding import buildScene
 
 # V1 : placement via relations + sceneBuilding | V2 : LLM calcule direct les coords
@@ -26,12 +26,16 @@ def _place_objects(prompt, objet_reconnus, relations_corrigees=None):
         root_id = relations_data.get("root", "")
         relations = relations_data.get("relations", [])
 
+        scales_result = scale(prompt, objet_reconnus)
+        objet_reconnus = final_json(objet_reconnus, scales_result)
+
         items = []
         for label, info in objet_reconnus.items():
             items.append({
                 "id": label,
                 "urdf": info["urdf"],
                 "dimensions": info.get("dimensions"),
+                "scale": info.get("scale", 1.0),
                 "root": (label == root_id),
             })
 
@@ -48,8 +52,6 @@ def _place_objects(prompt, objet_reconnus, relations_corrigees=None):
             quat = item.get("quat", (0, 0, 0, 1))
             x, y, z, w = quat
             item["quat"] = [w, x, y, z]
-            if "scale" not in item:
-                item["scale"] = 1.0
 
         return items
     else:

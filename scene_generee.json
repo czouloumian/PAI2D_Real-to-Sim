@@ -7,42 +7,42 @@
       1.7345,
       1.1516
     ],
+    "scale": 0.35,
     "root": false,
     "path": "/Users/anaisazouaoui/Desktop/PAI2D/projet Real-to-Sim/PAI2D_Real-to-Sim/src/../objets/10357_poubelle/mobility.urdf",
     "pos": [
-      0.014952358024041462,
-      -0.03724364444497344,
-      1.5926
+      0.04842771846299476,
+      0.3837385331585748,
+      1.1437300000000001
     ],
     "quat": [
       0,
       0,
       0,
       1
-    ],
-    "scale": 1.0
+    ]
   },
   {
-    "id": "lave linge",
-    "urdf": "11826_lave_linge",
+    "id": "refrigerateur",
+    "urdf": "10143_refrigerateur",
     "dimensions": [
-      1.1075,
-      1.5321,
-      0.9968
+      0.8589,
+      1.5259,
+      0.9222
     ],
+    "scale": 1.0,
     "root": true,
-    "path": "/Users/anaisazouaoui/Desktop/PAI2D/projet Real-to-Sim/PAI2D_Real-to-Sim/src/../objets/11826_lave_linge/mobility.urdf",
+    "path": "/Users/anaisazouaoui/Desktop/PAI2D/projet Real-to-Sim/PAI2D_Real-to-Sim/src/../objets/10143_refrigerateur/mobility.urdf",
     "pos": [
       0,
       0,
-      0.5084
+      0.4711
     ],
     "quat": [
       0,
       0,
       0,
       1
-    ],
-    "scale": 1.0
+    ]
   }
 ]
