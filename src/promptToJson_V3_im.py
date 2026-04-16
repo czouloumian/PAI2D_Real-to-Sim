@@ -4,8 +4,12 @@ import re
 import requests
 from collections import defaultdict
 from PIL import Image
-from promptToJson_auxilieres import validate_json_response, object_rec
+import json
+from promptToJson_auxilieres import URL, object_rec
 from sceneBuilding import initPosAndQuat, processRelations, processOrientations
+
+_RE_JSON = re.compile(r"\{.*\}", re.DOTALL)
+VISION_TIMEOUT = 600   # secondes — modèle vision plus lent que texte
 
 SCENE_WIDTH = 5.0   # les limitations de la scene pour les positions normalisées, on peut changer
 SCENE_DEPTH = 5.0  
@@ -33,8 +37,7 @@ def load_images(image_sources):
 
 def call_vision_llm(images_b64, system_prompt, user_prompt):
     """
-    Appel llama3.2-vision via Ollama
-    Pas de "format":"json" non supporte par VLM askip
+    Appel llama3.2-vision via Ollama avec timeout étendu.
     """
     payload = {
         "model": "llama3.2-vision",
@@ -42,12 +45,18 @@ def call_vision_llm(images_b64, system_prompt, user_prompt):
         "prompt": user_prompt,
         "images": images_b64,
         "stream": False,
-        "options": {"temperature": 0}
+        "options": {"temperature": 0, "num_predict": 512}
     }
     print("[call_vision_llm] Envoi requête à Ollama...")
-    result = validate_json_response(payload)
+    response = requests.post(URL, json=payload, timeout=VISION_TIMEOUT)
+    if response.status_code != 200:
+        raise RuntimeError(f"Erreur Ollama vision (HTTP {response.status_code}): {response.text}")
+    raw = response.json().get("response", "")
+    match = _RE_JSON.search(raw)
+    if not match:
+        raise ValueError(f"VLM n'a pas retourné de JSON valide. Réponse brute : {raw[:200]}")
     print("[call_vision_llm] Réponse reçue.")
-    return result
+    return json.loads(match.group())
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -121,13 +130,8 @@ RULES:
 - Multiple images = same scene from different angles — combine them.
 - Raw JSON only, no markdown, no comments."""
 
-    for attempt in range(3):
-        result = call_vision_llm(images_b64, system_prompt,"Analyse the image(s) as precisely as possible and return the JSON.")
-        if result.get("objects"):
-            return result
-        print(f"[detect_and_estimate] retry {attempt + 1} — aucun objet retourne")
-
-    return {"objects": [], "relations": []}
+    result = call_vision_llm(images_b64, system_prompt, "Analyse the image(s) as precisely as possible and return the JSON.")
+    return result if result.get("objects") else {"objects": [], "relations": []}
 
 
 # ─────────────────────────────────────────────────────────────────────────────
