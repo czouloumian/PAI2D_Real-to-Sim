@@ -181,6 +181,43 @@ class PlacementWorker(QObject):
             self.finished.emit()
 
 
+class ImageSceneWorker(QObject):
+    """Génère une scène à partir d'images via le pipeline V3."""
+    status_update = pyqtSignal(str)
+    scene_ready   = pyqtSignal(list)
+    error_occurred = pyqtSignal(str)
+    finished      = pyqtSignal()
+
+    def __init__(self, image_paths):
+        super().__init__()
+        self.image_paths = image_paths
+
+    def run(self):
+        try:
+            self.status_update.emit("Analyse de l'image en cours (V3)...")
+            from promptToJson_V3_im import scene_from_image
+            objetsList = scene_from_image(self.image_paths)
+            if not objetsList:
+                self.error_occurred.emit("Aucun objet reconnu dans l'image.")
+                return
+            # Résoudre les paths URDF
+            for obj in objetsList:
+                if "path" in obj:
+                    obj["path"] = resolve_urdf_path(obj["path"])
+            # Sauvegarder — sans postprocess_objects car quat déjà en [x,y,z,w]
+            with open(SCENE_OUTPUT_FILE, 'w', encoding='utf-8') as f:
+                json.dump(objetsList, f, indent=2, ensure_ascii=False)
+            print(f"[ImageSceneWorker] JSON sauvegardé → {SCENE_OUTPUT_FILE}")
+            self.scene_ready.emit(objetsList)
+        except (ConnectionError, RuntimeError, ValueError) as e:
+            self.error_occurred.emit(str(e))
+        except Exception as e:
+            traceback.print_exc()
+            self.error_occurred.emit(f"Erreur inattendue : {str(e)}")
+        finally:
+            self.finished.emit()
+
+
 class ModifySceneWorker(QObject):
     """Modifie une scene existante selon le prompt utilisateur."""
     status_update = pyqtSignal(str)

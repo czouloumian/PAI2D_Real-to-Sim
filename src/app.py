@@ -7,7 +7,8 @@ import html
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QSplitter,QVBoxLayout, QHBoxLayout, QTextBrowser, QLineEdit,QPushButton, QLabel, QFrame, QMessageBox,QFileDialog, QSizePolicy)
 from PyQt6.QtCore import Qt, QThread, QUrl
 from PyQt6.QtGui import QFont, QColor, QPalette
-from pipeline_worker import (RecognitionWorker, PlacementWorker, ModifySceneWorker, IntentWorker,SRC_DIR, SCENE_OUTPUT_FILE, objets_list, OBJETS_DIR)
+from pipeline_worker import (RecognitionWorker, PlacementWorker, ModifySceneWorker, IntentWorker,
+                             ImageSceneWorker, SRC_DIR, SCENE_OUTPUT_FILE, objets_list, OBJETS_DIR)
 from scene_3d_view import SceneView3D
 from conversation_session import ConversationSession
 
@@ -81,12 +82,18 @@ class MainWindow(QMainWindow):
         self.status_label.setStyleSheet("color: #4caf50; font-size: 11px;")
         layout.addWidget(self.status_label)
 
-        # ligne du bas : champ de saisie + bouton envoyer
+        # ligne du bas : champ de saisie + bouton image + bouton envoyer
         input_row = QHBoxLayout()
         self.prompt_input = QLineEdit()
         self.prompt_input.setPlaceholderText("Decrivez la scene s'il vous plait ")
         self.prompt_input.returnPressed.connect(self._on_send)
         input_row.addWidget(self.prompt_input, stretch=1)
+        self.image_btn = QPushButton("Image")
+        self.image_btn.setObjectName("image_btn")
+        self.image_btn.setFixedWidth(70)
+        self.image_btn.setToolTip("Générer la scène depuis une image (V3)")
+        self.image_btn.clicked.connect(self._on_load_image)
+        input_row.addWidget(self.image_btn)
         self.send_btn = QPushButton("Envoyer")
         self.send_btn.setFixedWidth(90)
         self.send_btn.clicked.connect(self._on_send)
@@ -425,6 +432,27 @@ class MainWindow(QMainWindow):
     #                    NOUVEAU THREAD / ACTIONS                         #
     # ------------------------------------------------------------------ #
 
+    def _on_load_image(self):
+        """Ouvre un sélecteur de fichier image et lance le pipeline V3."""
+        if self._thread and self._thread.isRunning():
+            QMessageBox.information(self, "En cours", "Generation en cours, veuillez patienter.")
+            return
+        paths, _ = QFileDialog.getOpenFileNames(
+            self, "Choisir une ou plusieurs images", "",
+            "Images (*.png *.jpg *.jpeg *.bmp *.webp)"
+        )
+        if not paths:
+            return
+        names = ", ".join(os.path.basename(p) for p in paths)
+        self._append_message(f"Image(s) : <b>{html.escape(names)}</b>", "user")
+        self.download_btn.setEnabled(False)
+        self.genesis_btn.setEnabled(False)
+        worker = ImageSceneWorker(paths)
+        if not self._launch_worker(worker):
+            return
+        worker.scene_ready.connect(self._on_scene_ready)
+        self._start_thread()
+
     def _on_new_thread(self):
         """Reinitialise tout pour une nouvelle conversation"""
         if self._thread and self._thread.isRunning():
@@ -515,6 +543,12 @@ class MainWindow(QMainWindow):
                 border-radius: 4px; padding: 4px 10px; font-size: 11px;
             }
             QPushButton#new_thread_btn:hover { background: #6c7086; }
+
+            QPushButton#image_btn {
+                background: #6c3483; color: white; border: none;
+            }
+            QPushButton#image_btn:hover { background: #8e44ad; }
+            QPushButton#image_btn:disabled { background: #313244; color: #585b70; }
 
             QLineEdit {
                 background: #313244; color: #cdd6f4;
