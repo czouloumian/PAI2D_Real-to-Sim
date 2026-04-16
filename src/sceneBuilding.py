@@ -25,7 +25,8 @@ def initPosAndQuat(items):
         (_, _, height) = item['dimensions']
         s = item.get('scale', 1.0)
         item['pos'] = (0, 0, 0.01 + height * s / 2)
-        item['quat'] = (0,0,0,1)
+        if not item.get('quat'):
+            item['quat'] = (0,0,0,1) #pas de rotation
     return items
 
 
@@ -39,7 +40,7 @@ def getRoot(items):
     placed_items = set()
 
     for item in items:
-        if item.get('root') is True:
+        if item.get('root') == 'true' or item.get('root') == 'True':
             placed_items.add(item['id'])
 
     # fallback : si aucun root explicite, utiliser le premier item
@@ -70,23 +71,43 @@ def changePosFromRel(rel, item, subject):
     s_sub = subject.get('scale', 1.0)
     subject_w, subject_d, subject_h = [d * s_sub for d in subject['dimensions']]
     (subject_x, subject_y, subject_z) = subject['pos']
+
+    if rel.get('distance'):
+        distance = rel['distance']
+        isDistance = True
+
     if rel['type'] == 'on':
         subject_x += random.uniform(x - width/2 + subject_w/2, x + width/2 - subject_w/2) #prise en compte des dims du sujet pour ne pas etre trop au bord
         subject_y += random.uniform(y - depth/2 + subject_d/2, y + depth/2 - subject_d/2)
         subject_z += z + height/2
     elif rel['type'] == 'in_front_of':
-        subject_x += random.uniform(x + width/2 + subject_w/2, x + width + subject_w/2)
-        subject_z = z
+        if isDistance:
+            subject_x += x + width/2 + subject_w/2 + distance
+            subject_z = z
+        else:
+            subject_x += random.uniform(x + width/2 + subject_w/2, x + width + subject_w/2)
+            subject_z = z
     elif rel['type'] == 'behind':
-        #subject_x += random.uniform(x - width/2 - subject_w/2, x - width - subject_w/2)
-        subject_x += random.uniform(x - width/2 - subject_w , x - width - subject_w/2) #temp fix
-        subject_z = z
-    elif rel['type'] == 'right_of':
-        subject_y += random.uniform(y + depth/2 + subject_d/2, y + depth + subject_d/2)
-        subject_z = z
+        if isDistance:
+            subject_x += x - width/2 - subject_w - distance
+            subject_z = z
+        else:
+            subject_x += random.uniform(x - width/2 - subject_w , x - width - subject_w/2) #temp fix
+            subject_z = z
+    elif rel['type'] == 'right_of': 
+        if isDistance:
+            subject_y += y + depth/2 + subject_d/2 + distance
+            subject_z = z
+        else:
+            subject_y += random.uniform(y + depth/2 + subject_d/2, y + depth + subject_d/2)
+            subject_z = z
     elif rel['type'] == 'left_of':
-        subject_y += random.uniform(y - depth/2 - subject_d/2, y - depth - subject_d/2)
-        subject_z = z
+        if isDistance:
+            subject_y += y - depth/2 - subject_d/2 - distance
+            subject_z = z
+        else:
+            subject_y += random.uniform(y - depth/2 - subject_d/2, y - depth - subject_d/2)
+            subject_z = z
     elif rel['type'] == 'against':
         subject_x = x + width/2 + subject_w/2 + 0.01
         subject_y = y
@@ -96,7 +117,10 @@ def changePosFromRel(rel, item, subject):
         subject_y = y
         subject_z = z 
     elif rel['type'] == 'facing':
-        subject_x = x + width/2 + subject_w/2 + random.uniform(0.1, 0.4)
+        if isDistance:
+            subject_x = x + width/2 + subject_w/2 + distance
+        else:
+            subject_x = x + width/2 + subject_w/2 + random.uniform(0.1, 0.4)
         subject_y = y
         subject_z = z
         qx, qy, qz, qw = subject.get('quat', [0, 0, 0, 1])
@@ -107,11 +131,45 @@ def changePosFromRel(rel, item, subject):
     subject['pos'] = (subject_x, subject_y, subject_z)
     
 
-def verifyRelations(): #TODO: classer en pos et quaternions possiblement?
+
+def changeQuatAndPosFromTurn(turn, item):
     '''
-    Vérifie que les relations sont valides, ne prend que les relations qui existent
+    Change les données d'orientation du sujet
     '''
-    pass
+    current = item.get('quat', [0, 0, 0, 1])
+    if not item.get('dimensions'):
+        item = getOriginalDimensions(item)
+    (width, depth, height) = item['dimensions']
+    rotations = {
+        'tip_left':[0, 0, 0.707, 0.707],
+        'tip_right':[0, 0, -0.707, 0.707],
+        'upside_down': [0, 0, 1, 0],
+        'tip_forward':[0.707, 0, 0, 0.707],
+        'tip_backward':[-0.707, 0, 0, 0.707],
+        'turn_right':[0, 0.707, 0, 0.707], 
+        'turn_left': [0, -0.707, 0, 0.707],
+        'turn_around':[1, 0, 0, 0]}
+    
+    if turn not in rotations:
+        print(f"chagement d'orientation non traité: {turn}")
+        return item
+    
+    #aja que les quaternions marchent avec des multiplications matricielle. enfin. j'avais déjà appris ça. il a fallu revoir.
+    change = rotations[turn]
+    x1, y1, z1, w1 = current
+    x2, y2, z2, w2 = change
+    new_quat = [w1*x2 + x1*w2 + y1*z2 - z1*y2, w1*y2 - x1*z2 + y1*w2 + z1*x2, w1*z2 + x1*y2 - y1*x2 + z1*w2, w1*w2 - x1*x2 - y1*y2 - z1*z2]
+    item['quat'] = new_quat
+
+    #et ensuite on change les dimensions vu que le dessus de l'objet n'et plus le meme etc...
+    if turn == 'turn_left' or turn == 'turn_right':
+        item['dimensions'] = (depth, width, height)
+    elif turn == 'tip_forward' or turn == 'tip_backward':
+        item['dimensions'] = (width, height, depth)
+    elif turn == 'tip_right' or turn == 'tip_left':
+        item['dimensions'] = (height, depth, width)
+
+    return item
 
 
 def processRelations(items, relations):
@@ -125,20 +183,21 @@ def processRelations(items, relations):
 
     items_dict = {item['id']: item for item in items} #pour pouvoir acceder aux differents items plus facilement
 
-    items = initPosAndQuat(items)
     placed_items = getRoot(items)
     
     relations = simplifyRelations(relations)
 
-    # filtrer les relations dont les IDs n'existent pas dans les items (sécurité)
-    reste = [rel for rel in relations
-             if rel.get('object', '') in items_dict and rel.get('subject', '') in items_dict]
+    reste = [rel for rel in relations if rel.get('object', '') in items_dict and rel.get('subject', '') in items_dict]
 
     while reste:
         progression = False
         for rel in reste[:]:
             item_id = rel['object']
             subject_id = rel['subject']
+            if item_id not in items_dict:
+                print(f"ATTENTION: ID objet inconnu dans relation: '{item_id}'")
+            if subject_id not in items_dict:
+                print(f"ATTENTION: ID objet inconnu dans relation: '{subject_id}'")
             item = items_dict[item_id]
             subject = items_dict[subject_id]
             if item_id not in placed_items:
@@ -154,11 +213,34 @@ def processRelations(items, relations):
     return items
 
 
-def buildScene(items, relations): #TODO verif si autres trucs needed
+def processOrientations(items,orientations):
+    '''
+    Adapte les quaternions des items en fonctions des changements d'orientation.
+
+    :param items: liste de dict d'items
+    :param relations: les changements d'orientation
+    :return: items, les items avec les bonnes orientations
+    '''
+    items_dict = {item['id']: item for item in items} #pour pouvoir acceder aux differents items plus facilement
+    for ori in orientations:
+        id = ori['id']
+        turn = ori['turn']
+        item = items_dict[id]
+        print(f"Avant: {id} quat={item.get('quat')}")
+        changeQuatAndPosFromTurn(turn, item)
+        print(f"Après: {id} quat={item.get('quat')}")
+    return items
+
+
+def buildScene(items, relations, orientations): #TODO c'est très moche comme façon de faire
     '''
     Ajoute à une liste de dictionnaires (un dict par item), toutes les infos nécessaies à la simulation, donc path et pos
     '''
     for item in items:
         item['path'] = getFilePath(item)
+        if not item.get('dimensions'):
+            item = getOriginalDimensions(item)
+    items = processOrientations(items,orientations)
+    items = initPosAndQuat(items)
     items = processRelations(items,relations)
     return items
