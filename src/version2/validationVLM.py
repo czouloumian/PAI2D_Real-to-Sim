@@ -127,6 +127,7 @@ def boucle_vlm(user_prompt, jsonFile, image_path, max_iter=3):
         history.append({
             'iteration': iter,
             'feedback': res.get('feedback', ''),
+            'correction': res.get('correction',''),
             'valid': res.get('valid', False)
         })
         with open(os.path.join(run_dir, 'history.json'), 'w') as f:
@@ -164,6 +165,7 @@ def boucle_vlm(user_prompt, jsonFile, image_path, max_iter=3):
         history.append({
             'iteration': iter,
             'feedback': res.get('feedback', ''),
+            'correction': res.get('correction',''),
             'valid': res.get('valid', False)
         })
         with open(os.path.join(run_dir, 'history.json'), 'w') as f:
@@ -207,6 +209,7 @@ def boucle_vlm(user_prompt, jsonFile, image_path, max_iter=3):
         history.append({
             'iteration': i,
             'feedback': res.get('feedback', ''),
+            'correction': res.get('correction',''),
             'valid': res.get('valid', False)
         })
         with open(os.path.join(run_dir, 'history.json'), 'w') as f:
@@ -388,8 +391,7 @@ def verif_orientation(jsonFile, image_path, original_prompt):
 def etapes_validation(original_prompt, jsonFile, image_path, collision_feedback=None):
     with open(jsonFile, 'r') as file:
         data = json.load(file)
-    pos_and_dims = [{'id': item['id'], 'pos': item['pos']} for item in data['objets']]
-    z_and_dims = [{'id': item['id'], 'pos': item['pos'],'dimensions': item['dimensions'] if 'dimensions' in item else None} for item in data['objets']]
+    pos_and_dims = [{'id': item['id'], 'pos': item['pos'], 'dimensions':item['dimensions']} for item in data['objets']]
     prompt = """You are a scene validator.
     Check if the scene matches the prompt and if there are collisions.
     Return corrected positions only.
