@@ -1,6 +1,6 @@
 import genesis as gs
 import os
-from PIL import Image, ImageDraw, ImageFont #https://pillow.readthedocs.io/en/stable/
+from PIL import Image, ImageFont #https://pillow.readthedocs.io/en/stable/
 
 #TODO
 #prendre le truc pour lire le JSON et extraire les infos des objets
