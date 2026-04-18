@@ -200,14 +200,12 @@ class ImageSceneWorker(QObject):
             if not objetsList:
                 self.error_occurred.emit("Aucun objet reconnu dans l'image.")
                 return
-            # Résoudre les paths URDF
             for obj in objetsList:
                 if "path" in obj:
                     obj["path"] = resolve_urdf_path(obj["path"])
-            # Sauvegarder — sans postprocess_objects car quat déjà en [x,y,z,w]
             with open(SCENE_OUTPUT_FILE, 'w', encoding='utf-8') as f:
                 json.dump(objetsList, f, indent=2, ensure_ascii=False)
-            print(f"[ImageSceneWorker] JSON sauvegardé → {SCENE_OUTPUT_FILE}")
+            print(f"[ImageSceneWorker] JSON sauvegarde {SCENE_OUTPUT_FILE}")
             self.scene_ready.emit(objetsList)
         except (ConnectionError, RuntimeError, ValueError) as e:
             self.error_occurred.emit(str(e))
