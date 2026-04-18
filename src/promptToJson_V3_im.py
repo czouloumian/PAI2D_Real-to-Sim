@@ -8,8 +8,9 @@ import json
 from promptToJson_auxilieres import URL, object_rec
 from sceneBuilding import initPosAndQuat, processRelations, processOrientations
 
-_RE_JSON = re.compile(r"\{.*\}", re.DOTALL)
-VISION_TIMEOUT = 600   # secondes — modèle vision plus lent que texte
+RE_JSON = re.compile(r"\{.*\}", re.DOTALL)
+RE_CODE_BLOCK = re.compile(r"```(?:json)?\s*([\s\S]*?)```")
+VISION_TIMEOUT = 600 
 
 SCENE_WIDTH = 5.0   # les limitations de la scene pour les positions normalisées, on peut changer
 SCENE_DEPTH = 5.0  
@@ -18,13 +19,11 @@ SCENE_DEPTH = 5.0
 # les autres (left_of, right_of…) sont gerees par les positions x y norm de l'image
 VERTICAL_RELATIONS = {"on", "under", "inside"}
 RE_SUFFIX = re.compile(r'_\d+$')   
-
 MAX_IMAGE_SIZE = 640   # px sur le côté le plus long — réduit le temps de l'encodeur vision
 
 def load_images(image_sources):
     """
-    Charge les images, convertit en RGB (supprime le canal alpha si RGBA),
-    redimensionne à MAX_IMAGE_SIZE pour accélérer l'encodeur vision.
+    Charge les images, convertit en RGB (supprime le canal alpha si RGBA)
     """
     images = []
     for source in image_sources:
@@ -38,21 +37,19 @@ def load_images(image_sources):
         buf = io.BytesIO()
         img.save(buf, format="PNG")
         images.append(base64.b64encode(buf.getvalue()).decode("utf-8"))
-        print(f"[load_images] {source} → {img.size} RGB")
+        print(f"[load_images] {source} -> {img.size} RGB")
     return images
 
 
-def call_vision_llm(images_b64, system_prompt, user_prompt):
+def call_vision_llm(images, system_prompt, user_prompt):
     """
-    Appel llama3.2-vision via Ollama en mode streaming.
-    Le streaming maintient la connexion active token par token,
-    évitant le read-timeout qui survenait avec stream=False.
+    Appel llama3.2-vision
     """
     payload = {
         "model": "llama3.2-vision",
         "system": system_prompt,
         "prompt": user_prompt,
-        "images": images_b64,
+        "images": images,
         "stream": True,
         "options": {"temperature": 0, "num_predict": 512}
     }
@@ -70,11 +67,22 @@ def call_vision_llm(images_b64, system_prompt, user_prompt):
         if chunk.get("done"):
             break
 
-    print("[call_vision_llm] Réponse reçue.")
-    match = _RE_JSON.search(full_response)
-    if not match:
-        raise ValueError(f"VLM n'a pas retourné de JSON valide. Réponse brute : {full_response[:200]}")
-    return json.loads(match.group())
+    print("[call_vision_llm] Reponse recue.")
+    # essai dans un code block ('''json ... '''ou ''' ... ''')
+    m = RE_CODE_BLOCK.search(full_response)
+    if m:
+        try:
+            return json.loads(m.group(1).strip())
+        except json.JSONDecodeError:
+            pass
+    # fallback : chercher un bloc {...}
+    m = RE_JSON.search(full_response)
+    if m:
+        try:
+            return json.loads(m.group())
+        except json.JSONDecodeError:
+            pass
+    raise ValueError(f"VLM n'a pas retourne de JSON valide. Reponse brute:\n{full_response[:400]}")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -83,7 +91,7 @@ def call_vision_llm(images_b64, system_prompt, user_prompt):
 
 VALID_ORIENTATIONS = { "default", "turn_left", "turn_right", "turn_around","tip_forward", "tip_backward", "tip_left", "tip_right", "upside_down"}
 
-def detect_and_estimate(images_b64):
+def detect_and_estimate(images):
     """
     Le LLM vision analyse les images et retourne :
       - objects  : liste de {label, pos_norm, scale, orientation}
@@ -98,8 +106,8 @@ TASK:
 1. Detect every distinct visible object in the image(s).
 2. For each object estimate:
    - pos_norm: [x, y] — normalised centre of the object in the image.
-       x = 0.0 → left edge,  x = 1.0 → right edge.
-       y = 0.0 → top edge,   y = 1.0 → bottom edge.
+       x = 0.0 -> left edge,  x = 1.0 -> right edge.
+       y = 0.0 -> top edge,   y = 1.0 -> bottom edge.
        Be as precise as possible: use the actual centre of the object's bounding box.
    - scale: factor to reach the object's real-world size.
        Estimate from the apparent size relative to other objects and the scene.
@@ -118,7 +126,7 @@ TASK:
        "tip_left"     — tilted/fallen to the left
        "tip_right"    — tilted/fallen to the right
        "upside_down"  — completely inverted
-       → Use "default" unless a rotation is CLEARLY visible.
+       -> Use "default" unless a rotation is CLEARLY visible.
 3. Extract ONLY the spatial relations that are unambiguously visible:
    - "on"         : A rests on top of B      - "under"      : A is below B
    - "inside"     : A is inside B            - "left_of"    : A is to the left of B
@@ -146,9 +154,10 @@ RULES:
 - subject/object in relations must be EXACT labels from the objects list above.
 - "relations": [] if nothing is clearly visible.
 - Multiple images = same scene from different angles — combine them.
-- Raw JSON only, no markdown, no comments."""
+- Raw JSON only. No markdown, no asterisks, no bullet points, no comments.
+- Your response must start with { and end with }. Nothing before or after."""
 
-    result = call_vision_llm(images_b64, system_prompt, "Analyse the image(s) as precisely as possible and return the JSON.")
+    result = call_vision_llm(images, system_prompt, "Analyse the image(s) as precisely as possible and return the JSON.")
     return result if result.get("objects") else {"objects": [], "relations": []}
 
 
@@ -170,7 +179,7 @@ def find_root(catalogue_labels, remapped_relations):
 
 def remap_relations(relations, label_mapping, valid_labels):
     """
-    traduit les labels vision -> labels catalogue dans les relations, et filtre celles dont les deux extremites ne sont pas dans le catalogue.
+    traduit les labels vision -> labels catalogue dans les relations
     """
     remapped = []
     for rel in relations:
