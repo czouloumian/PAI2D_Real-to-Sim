@@ -8,7 +8,7 @@
             "pos": [
                 0.0,
                 0.0,
-                0.051
+                0.01
             ],
             "quat": [
                 0,
@@ -23,9 +23,9 @@
             ]
         },
         {
-            "id": "banana",
+            "id": "banane",
             "urdf": "model.urdf",
-            "path": "/home/invite/PAI2D_Real-to-Sim/src/version2/../../objets/011_banana/google_16k/model.urdf",
+            "path": "/home/invite/PAI2D_Real-to-Sim/src/version2/../../objets/011_banane/google_16k/model.urdf",
             "scale": 0.26,
             "pos": [
                 0.0,
@@ -33,10 +33,10 @@
                 0.35
             ],
             "quat": [
+                0.707,
                 0,
                 0,
-                0,
-                1
+                0.707
             ],
             "dimensions": [
                 0.19223400000000002,
@@ -74,13 +74,13 @@
             "pos": [
                 0.0,
                 0.0,
-                0.36
+                0.375
             ],
             "quat": [
                 0,
                 0,
-                0,
-                1
+                1,
+                0
             ],
             "dimensions": [
                 0.05,

@@ -16,7 +16,7 @@ def create_scene(objetsList):
 
     :param objets: une liste de dictionnaires des infos pour chaque objet (id, urdf, path, pos)
     '''
-    gs.init(backend=gs.cpu)
+    gs.init(backend=gs.cuda)
 
     scene = gs.Scene(show_viewer=True)
 
@@ -53,7 +53,7 @@ def create_scene_validation(objetsList, fixed=False):
 
     gs.init(backend=gs.cuda)
 
-    scene = gs.Scene(show_viewer=True, sim_options=gs.options.SimOptions(dt=0.01))
+    scene = gs.Scene(show_viewer=False, sim_options=gs.options.SimOptions(dt=0.01))
 
     plane = scene.add_entity(gs.morphs.Plane()) #la ground plaine
 

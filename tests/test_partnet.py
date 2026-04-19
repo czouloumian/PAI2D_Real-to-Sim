@@ -8,8 +8,8 @@ def create_scene(path):
 
     :param objets: une liste de dictionnaires des infos pour chaque objet (id, urdf, path, pos)
     '''
-    gs.init(backend=gs.cpu)
-    scene = gs.Scene(show_viewer=True, sim_options=gs.options.SimOptions(dt=0.001))
+    gs.init(backend=gs.cuda)
+    scene = gs.Scene(show_viewer=True, sim_options=gs.options.SimOptions(dt=0.0002))
     plane = scene.add_entity(gs.morphs.Plane())
     entity = scene.add_entity(
         gs.morphs.URDF(
@@ -41,7 +41,23 @@ def main():
                  "44817_meuble_tiroirs/mobility.urdf","100073_cle_usb/mobility.urdf", 
                  "100658_boite_carton_ouverte/mobility.urdf", "103369_lave_vaisselle/mobility.urdf",
                  "103477_toaster/mobility.urdf"]
-    for filename in liste_partnet_marche_pas:
+    
+    liste_ycb_marche = ["011_banane/google_16k/model.urdf","035_power_drill/google_16k/model.urdf","037_scissors/google_16k/model.urdf"]
+
+    liste_ycb_marche_pas = ["003_cracker_box/google_16k/model.urdf", "005_tomato_soup_can/google_16k/model.urdf",
+                        "009_gelatin_box/google_16k/model.urdf", "010_potted_meat_can/google_16k/model.urdf",
+                        "011_banane/google_16k/model.urdf","021_bleach_cleanser/google_16k/model.urdf",
+                        "025_mug/google_16k/model.urdf", "035_power_drill/google_16k/model.urdf","037_scissors/google_16k/model.urdf"]
+
+    liste_ycb = ["035_power_drill/google_16k/model.urdf","037_scissors/google_16k/model.urdf"]
+
+    curr = ["10143_refrigerateur/mobility.urdf", "10211_ordinateur_portable/mobility.urdf", 
+                                "11826_lave_linge/mobility.urdf", "10357_poubelle/mobility.urdf", "11826_lave_linge/mobility.urdf",
+                                "44817_meuble_tiroirs/mobility.urdf","100658_boite_carton_ouverte/mobility.urdf","103369_lave_vaisselle/mobility.urdf",
+                                "103477_toaster/mobility.urdf"]
+
+
+    for filename in curr:
         items_folder = os.path.join(os.path.dirname(__file__),'..', 'objets')
         path = os.path.join(items_folder, filename)
         create_scene(path)

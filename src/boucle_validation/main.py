@@ -14,10 +14,10 @@ def main():
     create_scene(itemsList)
     
     #boucle de validation avec le VLM:
-    #path_to_screenshot = create_scene_validation(itemsList)
-    #prompt = "Je veux des ciseaux, un mug et une banane sur une table." #TODO: ana aura un truc qui donne les objets disponibles
-    #validation = boucle_vlm(prompt, path, path_to_screenshot)
-    #print("Validation:", validation)
+    path_to_screenshot = create_scene_validation(itemsList)
+    prompt = "Je veux des ciseaux, un mug et une banane sur une table." #TODO: ana aura un truc qui donne les objets disponibles
+    validation = boucle_vlm(prompt, path, path_to_screenshot)
+    print("Validation:", validation)
 
     #truc de prompt de base
     #simul genesis

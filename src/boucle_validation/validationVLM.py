@@ -8,39 +8,35 @@ import trimesh
 import shutil
 from datetime import datetime
 from jsonToSim import create_scene_validation
+#from itemSpec import getOriginalDimensions, getFilePath
 
-def getFilePath(itemsList):
+def getFilePath(item):
     '''
     Donne le path pour l'item URDF.
 
     :param item: le dictionnaire d'item avec id et urdf
     :return path: le path pour l'item
     '''
-    items_folder = os.path.join(os.path.dirname(__file__),'..','..', 'objets')
-    for item in itemsList:
-        item['path'] = os.path.join(items_folder, item['urdf'])
-        if not os.path.exists(item['path']):
-            raise FileNotFoundError(f"Pour {item['id']}, le fichier {item['urdf']} est introuvable.")
+    items_folder = os.path.join(os.path.dirname(__file__),'..', 'objets')
+    base = os.path.join(items_folder, item['urdf'])
+    if not os.path.exists(base):
+        raise FileNotFoundError(f"Pour {item['id']}, le fichier {item['urdf']} est introuvable.")
+    #path = addMass(path)
 
-        #TODO: question: pourquoi on cherche d'autres fichiers que mobility.urdf? à changer et à comprendre pour partnet
-        #if os.path.isdir(base):
-        #    for name in ["mobility.urdf", "kinbody.xml", "textured.obj", "nontextured.stl", "nontextured.ply"]:
-        #        path = os.path.join(base, name)
-        #        if os.path.exists(path):
-        #            return path
-        #    raise FileNotFoundError(f"Aucun fichier exploitable trouvé dans {base}")
+    #TODO: question: pourquoi on cherche d'autres fichiers que mobility.urdf?
+    # si c'est un dossier on cherche un fichier qui existe
+    if os.path.isdir(base):
+        for name in ["mobility.urdf", "kinbody.xml", "textured.obj", "nontextured.stl", "nontextured.ply"]:
+            path = os.path.join(base, name)
+            if os.path.exists(path):
+                return path
 
-    return itemsList
+        raise FileNotFoundError(f"Aucun fichier exploitable trouvé dans {base}")
 
-def create_run_dir():
-    '''un dossier pour chaque run'''
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    run_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'runs', timestamp)
-    os.makedirs(run_dir, exist_ok=True)
-    return run_dir
+    return base
 
 
-def getOriginalDimensions(items):
+def getOriginalDimensions(items): #TODO: attention c'est pas la meme que dans v1, à changer
     '''
     Extrait les dimensions de l'item URDF, qui sont dans '<geometry>'
 
@@ -80,6 +76,14 @@ def getOriginalDimensions(items):
                     item['dimensions'] = (0.1,0.1,0.1)
     return items
 
+def create_run_dir():
+    '''un dossier pour chaque run'''
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    run_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'runs', timestamp)
+    os.makedirs(run_dir, exist_ok=True)
+    return run_dir
+
+
 def checkOverlap(items):
     for i, item1 in enumerate(items):
         for j, item2 in enumerate(items):
@@ -92,8 +96,32 @@ def checkOverlap(items):
             
             if (abs(x1-x2) < (w1+w2)/2 and abs(y1-y2) < (d1+d2)/2 and abs(z1-z2) < (h1+h2)/2):
                 print(f"overlap détecté entre {item1['id']} et {item2['id']}!")
-                return False
-    return True
+                return True
+    return False
+
+#TODO: check 'on'
+
+
+def save_iteration_scene(image_path, iter, run_dir, phase, itemsList):
+    shutil.copy(image_path, os.path.join(run_dir, f"iteration_{phase}_{iter}_image.png"))
+    with open(os.path.join(run_dir, f'iter_{iter}_scene.json'), 'w') as f:
+        json.dump({'objets': itemsList}, f, indent=4)
+
+
+def correct_json(jsonFile, corrections, field):
+    with open(jsonFile, 'r') as file:
+        data = json.load(file)
+    existing_id = {item['id'] for item in data['objets']}
+    for c_id in corrections.keys():
+        if c_id not in existing_id:
+            print(f"ATTENTION: l'ID {c_id} n'est pas dans le JSON, skipping correction.")
+    for item in data['objets']:
+        if item['id'] in corrections:
+            old_value = item[field]
+            item[field] = corrections[item['id']]
+            print(f"CORRECTION: {field} corrigée pour {item['id']}: {old_value} → {item[field]}")
+    with open(jsonFile, 'w') as file:
+        json.dump(data, file, indent=4)
 
 
 def clean_reponse(resultat):
@@ -113,14 +141,13 @@ def boucle_vlm(user_prompt, jsonFile, image_path, max_iter=3):
     history = []
 
     for iter in range(max_iter):
+        print("BOUCLE FIXAGE, ITERATION ", iter)
         with open(jsonFile, 'r') as file:
             data = json.load(file)
         itemsList = data.get('objets', [])
         itemsList = getOriginalDimensions(itemsList)
         image_path = create_scene_validation(itemsList, fixed=True)
-        shutil.copy(image_path, os.path.join(run_dir, f"iteration_sol_{iter}_image.png"))
-        with open(os.path.join(run_dir, f'iter_sol_{iter}_scene.json'), 'w') as f:
-            json.dump(data, f)
+        save_iteration_scene(image_path, iter, run_dir, "sol", itemsList)
 
         res = verif_fixage_sol(jsonFile, image_path)
 
@@ -128,7 +155,8 @@ def boucle_vlm(user_prompt, jsonFile, image_path, max_iter=3):
             'iteration': iter,
             'feedback': res.get('feedback', ''),
             'correction': res.get('correction',''),
-            'valid': res.get('valid', False)
+            'valid': res.get('valid', False),
+            'reasoning': res.get('reasoning', '')
         })
         with open(os.path.join(run_dir, 'history.json'), 'w') as f:
             json.dump(history, f, indent=4)
@@ -137,36 +165,29 @@ def boucle_vlm(user_prompt, jsonFile, image_path, max_iter=3):
             print("FIXAGE VALIDE")
             break
         else:
-            if "new_scene" in res:
-                with open(jsonFile, 'w') as file:
-                    json.dump({'objets': res['new_scene']['objets']}, file) 
-            else:
-                if 'objets' in res:
-                    items = res['objets']
-                    with open(jsonFile, 'w') as file:
-                        json.dump({'objets': items}, file)
-                else:
-                    print("le llm n'a pas donné de nouvelle scene")
-                    continue
-    print("boucle fixage terminee")
+            print("FEEDBACK: ", res.get('feedback', 'pas de feedback'))
+    else:        
+        print("Fixage sol non validé après ", max_iter, " itérations")
 
 
     for iter in range(max_iter):
-        print("START DE LA BOUCLE ORIENTATION, ITERATION ", iter)
+        print("BOUCLE ORIENTATION, ITERATION ", iter)
         with open(jsonFile, 'r') as file:
             data = json.load(file)
         itemsList = data.get('objets', [])
         itemsList = getOriginalDimensions(itemsList)
+
         image_path = create_scene_validation(itemsList, fixed=True)
-        shutil.copy(image_path, os.path.join(run_dir, f"iteration_orientation_{iter}_image.png"))
-        with open(os.path.join(run_dir, f'iter_orientation_{iter}_scene.json'), 'w') as f:
-            json.dump(data, f)
+        save_iteration_scene(image_path, iter, run_dir, "orientation", itemsList)
+
         res = verif_orientation(jsonFile, image_path, user_prompt)
+
         history.append({
             'iteration': iter,
             'feedback': res.get('feedback', ''),
             'correction': res.get('correction',''),
-            'valid': res.get('valid', False)
+            'valid': res.get('valid', False),
+            'reasoning': res.get('reasoning', '')
         })
         with open(os.path.join(run_dir, 'history.json'), 'w') as f:
             json.dump(history, f, indent=4)
@@ -174,43 +195,31 @@ def boucle_vlm(user_prompt, jsonFile, image_path, max_iter=3):
             print("ORIENTATION VALIDE")
             break
         else:
-            if "new_scene" in res:
-                with open(jsonFile, 'w') as file:
-                    json.dump({'objets': res['new_scene']['objets']}, file) 
-            else:
-                if 'objets' in res:
-                    items = res['objets']
-                    with open(jsonFile, 'w') as file:
-                        json.dump({'objets': items}, file)
-                else:
-                    print("le llm n'a pas donné de nouvelle scene")
-                    continue
-    print("boucle orientation terminee")
+            print("FEEDBACK: ", res.get('feedback', 'pas de feedback'))
+    else:     
+        print("Orientation non validée après ", max_iter, " itérations")
 
-
-    for i in range(max_iter):
-        print("START DE LA BOUCLE ETAPES, ITERATION ", i)
+    for iter in range(max_iter):
+        print("BOUCLE SEMANTIQUE + COLLISIONS, ITERATION ", iter)
         with open(jsonFile, 'r') as file:
             data = json.load(file)
         itemsList = data.get('objets', [])
-        #itemsList = getFilePath(itemsList) #TODO: a changer plus tard
         itemsList = getOriginalDimensions(itemsList)
 
         has_overlap = checkOverlap(itemsList)
         collision_feedback = "overlap detected" if has_overlap else "no overlap"
         image_path = create_scene_validation(itemsList, fixed=True)
 
-        shutil.copy(image_path, os.path.join(run_dir, f"iteration_boucle_{iter}_image.png"))
-        with open(os.path.join(run_dir, f'iter_boucle_{iter}_scene.json'), 'w') as f:
-            json.dump(data, f)
+        save_iteration_scene(image_path, iter, run_dir, "etapes", itemsList)
 
         res = etapes_validation(user_prompt,jsonFile,image_path, collision_feedback)
 
         history.append({
-            'iteration': i,
+            'iteration': iter,
             'feedback': res.get('feedback', ''),
             'correction': res.get('correction',''),
-            'valid': res.get('valid', False)
+            'valid': res.get('valid', False),
+            'reasoning': res.get('reasoning', '')
         })
         with open(os.path.join(run_dir, 'history.json'), 'w') as f:
             json.dump(history, f, indent=4)
@@ -220,18 +229,6 @@ def boucle_vlm(user_prompt, jsonFile, image_path, max_iter=3):
             return res
         else:
             print("echec: ", res.get("feedback"))
-            if "new_scene" in res:
-                with open(jsonFile, 'w') as file:
-                    json.dump({'objets': res['new_scene']['objets']}, file) 
-            else:
-                if 'objets' in res:
-                    items = res['objets']
-                    with open(jsonFile, 'w') as file:
-                        json.dump({'objets': items}, file)
-                else:
-                    print("le llm n'a pas donné de nouvelle scene")
-                    continue
-        print(f"itération {i+1}: {res}")
     return res
 
 
@@ -273,6 +270,7 @@ def verif_fixage_sol(jsonFile, image_path):
                     
             You MUST respond with ONLY this JSON format:
             {
+                "reasoning": "the mug is clipping into the ground plane in the side view, we need to increase its z coordinate to be above the ground plane",
                 "valid": false,
                 "feedback": "mug is clipping into ground",
                 "corrections": [
@@ -295,13 +293,21 @@ def verif_fixage_sol(jsonFile, image_path):
         resultat = json.loads(clean)
     except json.JSONDecodeError:
         print("json invalide pour verif fixage sol")
-    if 'corrections' in resultat:
+        return {"valid": False, "feedback": "json invalide", "corrections": []}
+    if 'corrections' in resultat and resultat['corrections']:
         corrections = {}
         for c in resultat['corrections']:
             if 'z' in c:
                 corrections[c['id']] = c['z']
             elif 'pos' in c and len(c['pos']) == 3:
                 corrections[c['id']] = c['pos'][2]
+
+        existing_id = {item['id'] for item in data['objets']}
+
+        for c_id in corrections.keys(): #hallucunation
+            if c_id not in existing_id:
+                print(f"ATTENTION: l'ID {c_id} n'est pas dans le JSON, skipping correction.")
+
         for item in data['objets']:
             if item['id'] in corrections:
                 old_z = item['pos'][2]
@@ -317,8 +323,7 @@ def verif_fixage_sol(jsonFile, image_path):
 def verif_orientation(jsonFile, image_path, original_prompt):
     with open(jsonFile, 'r') as file:
         data = json.load(file)
-    quat_only = [{'id': item['id'], 'quat': item.get('quat', [0,0,0,1])} 
-                 for item in data['objets']]
+    quat_only = [{'id': item['id'], 'quat': item.get('quat', [0,0,0,1])} for item in data['objets']]
     
     prompt = """You are an orientation corrector for 3D scenes.
     Your task is to check if objects are oriented correctly based on the prompt and the image.
@@ -327,7 +332,7 @@ def verif_orientation(jsonFile, image_path, original_prompt):
     - X axis: left/right
     - Y axis: forward/backward  
     - Z axis: up/down
-    - Quaternion format: [x, y, z, w] where [0,0,0,1] means no rotation
+    - Quaternion format: [x, y, z, w] where [0,0,0,1] means no rotation (convention ROS)
     
     Common useful rotations:
     - No rotation: [0, 0, 0, 1]
@@ -350,6 +355,7 @@ def verif_orientation(jsonFile, image_path, original_prompt):
     
     You MUST respond with ONLY this JSON format:
     {
+        "reasoning": "the mug is lying on its side in the perspective and side views, it should be upright according to the prompt, we need to change its quaternion to make it upright",
         "valid": true,
         "feedback": "all objects correctly oriented",
         "corrections": [
@@ -374,17 +380,7 @@ def verif_orientation(jsonFile, image_path, original_prompt):
         return {"valid": True}
     if 'corrections' in resultat:
         corrections = {c['id']: c['quat'] for c in resultat['corrections']}
-        for item in data['objets']:
-            if item['id'] in corrections:
-                old_quat = item.get('quat', [0,0,0,1])
-                new_quat = corrections[item['id']]
-                norm = sum(x**2 for x in new_quat) ** 0.5
-                if norm < 0.01: #ignore parce a=que pas valide
-                    continue
-                item['quat'] = [x/norm for x in new_quat]
-                print(f"Quat corrigé pour {item['id']}: {old_quat} → {item['quat']}")
-        with open(jsonFile, 'w') as file:
-            json.dump(data, file, indent=4)
+        correct_json(jsonFile, corrections, 'quat')
     return resultat
 
 
@@ -406,6 +402,7 @@ def etapes_validation(original_prompt, jsonFile, image_path, collision_feedback=
     
     You MUST respond with ONLY this JSON format:
     {
+        "reasoning": "the mug is too far to the left in the top-down view, it should be closer to the center to be on the table as specified in the prompt, we need to adjust its x coordinate",
         "valid": true,
         "feedback": "scene matches prompt",
         "corrections": [
@@ -438,113 +435,5 @@ def etapes_validation(original_prompt, jsonFile, image_path, collision_feedback=
         return {"valid": False, "feedback": "json invalide"}
     if 'corrections' in resultat:
         corrections = {c['id']: c['pos'] for c in resultat['corrections']}
-        for item in data['objets']:
-            if item['id'] in corrections:
-                old_pos = item['pos']
-                item['pos'] = corrections[item['id']]
-                print(f"Pos corrigée pour {item['id']}: {old_pos} → {item['pos']}")
-        
-        with open(jsonFile, 'w') as file:
-            json.dump(data, file, indent=4)
+        correct_json(jsonFile, corrections, 'pos')
     return resultat
-
-
-
-def etapes_validation_old(original_prompt, jsonFile, image_path, collision_feedback=None):
-    with open(jsonFile, 'r') as file:
-        data = json.load(file)
-    pos_only = [{'id': item['id'], 'pos': item['pos']} for item in data['objets']]
-    #collisions
-    prompt1 = """You are a collision corrector. If the collision feedback states that there is collision, correct the scene so there is no collision anymore. Only correct the posistion, "pos".
-
-                You will receive:
-                    - The current scene as a JSON object
-                    - a collage containing THREE images of the same scene:
-                        1. PERSPECTIVE VIEW: General context.
-                        2. TOP-DOWN VIEW: Best for X, Y coordinates and checking if objects are side-by-side.
-                        3. SIDE VIEW: Best for Z coordinate (height) to check if objects are at the right height.
-
-                RULES:
-                    - ONLY output the JSON object, nothing else
-                    - NO markdown, NO backticks, NO explanations before or after
-                    - NEVER rename keys, only change values
-                    - Always use double quotes for keys and strings
-                    - ALWAYS keep the same "id" and "urdf" values as the input JSON
-                    - Keep the same number of objects as the input JSON, do not add or remove objects
-                    - ONLY change "pos" values to fix the scene
-                    - DO NOT change 'id', 'urdf', or 'path'.
-                    - If valid is true, new_scene can be identical to the input
-                    - ALWAYS include the "new_scene" field, even if the scene is valid
-                    - There should NOT be ANY collisions
-                    - If objects overlap, 'valid' is FALSE.
-                        
-                You MUST respond with ONLY a valid JSON object, exactly in this format:
-                    {
-                        "valid": true,
-                        "feedback": "scene is correct",
-                        "new_scene": {
-                            "objets": [
-                                {"id": "mug", "urdf": "mug.urdf", "path": "", "pos": [0.0, 0.5, 0.3], "quat": [0.0, 0.0, 0.0, 1.0]},
-                                {"id": "table", "urdf": "table.urdf", "path": "", "pos": [0.0, 0.0, 0.0], "quat": [0.0, 0.0, 0.0, 1.0]}
-                            ]
-                        }
-                    }
-                """
-
-    resultat1 = ollama.chat(model="llama3.2-vision", messages=[{'role': 'system', 'content': prompt1},
-                {'role': 'user','content': f"Current JSON scene: {json.dumps(data)}\nCollision report: {collision_feedback}",'images': [image_path]}])
-    clean = clean_reponse(resultat1['message']['content'])
-    skip = False
-    try:
-        resultat1 = json.loads(clean)
-    except json.JSONDecodeError:
-        skip = True
-        print("json invalide pour la correction de collision")
-    if skip == False and not resultat1.get('valid'):
-        return resultat1
-    
-    #semantique
-    prompt2 = """ Your role is to verify if the generated scene matches the prompt. If it doesn't, correct the json file descibing the scene so it matches the prompt.
-
-                You will receive:
-                    - The current scene as a JSON object
-                    - 
-                    - a collage containing THREE images of the same scene:
-                        1. PERSPECTIVE VIEW: General context.
-                        2. TOP-DOWN VIEW: Best for X, Y coordinates and checking if objects are side-by-side.
-                        3. SIDE VIEW: Best for Z coordinate (height) to check if objects are floating or clipping into the floor.
-
-                RULES:
-                    - ONLY output the JSON object, nothing else
-                    - NEVER rename keys, only change values
-                    - NO markdown, NO backticks, NO explanations before or after
-                    - Always use double quotes for keys and strings
-                    - ALWAYS keep the same "id" and "urdf" values as the input JSON
-                    - Keep the same number of objects as the input JSON, do not add or remove objects
-                    - ONLY change "pos" values to fix the scene so it matches the prompt.
-                    - DO NOT change 'id', 'urdf', or 'path'.
-                    - If valid is true, new_scene can be identical to the input
-                    - ALWAYS include the "new_scene" field, even if the scene is valid.
-                    - If the generated scene doesn't match the prompt, 'valid' is FALSE.
-
-                You MUST respond with ONLY a valid JSON object, exactly in this format:
-                    {
-                        "valid": true,
-                        "feedback": "scene is correct",
-                        "new_scene": {
-                            "objets": [
-                                {"id": "mug", "urdf": "mug.urdf", "path": "", "pos": [0.0, 0.5, 0.3], "quat": [0.0, 0.0, 0.0, 1.0]},
-                                {"id": "table", "urdf": "table.urdf", "path": "", "pos": [0.0, 0.0, 0.0], "quat": [0.0, 0.0, 0.0, 1.0]}
-                            ]
-                        }
-                    }
-                """
-
-    resultat2 = ollama.chat(model="llama3.2-vision", messages=[{'role': 'system', 'content': prompt2},
-                {'role': 'user','content': f"Check and correct if the generated scene {json.dumps(data)} is accurate to the prompt {original_prompt}.",'images': [image_path]}])
-    clean = clean_reponse(resultat2['message']['content'])
-    try:
-        resultat2 = json.loads(clean)
-    except json.JSONDecodeError:
-        print("json invalide pour la correction de collision")
-    return resultat2

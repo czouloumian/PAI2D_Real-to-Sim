@@ -2,13 +2,42 @@ import os
 import random
 from .itemSpec import getOriginalDimensions, getFilePath
 from .jsonParsing import simplifyRelations
+import xml.etree.ElementTree as ET
+import trimesh
 
 
 '''
 Des liens utiles:
 https://wiki.ros.org/urdf/XML/link
-https://genesis-world.readthedocs.io/en/latest/user_guide/getting_started/conventions.html
+https://genesis-world.readthedocs.io/en/latest/user_guide/getting_started/conventions.htmlf
 '''
+
+
+def findHeightOffset(item):
+    tree = ET.parse(item['path'])
+    root = tree.getroot()
+    for geometry in root.iter('geometry'):
+        box= geometry.find('box')
+        if box is not None:
+            h = float(box.attrib['size'].split()[2])
+            return -h/2
+        cylinder = geometry.find('cylinder')
+        if cylinder is not None:
+            h = float(cylinder.attrib['length'])
+            return -h/2
+        sphere = geometry.find('sphere')
+        if sphere is not None:
+            h = float(sphere.attrib['radius'])
+            return -h
+        mesh = geometry.find('mesh')
+        if mesh is not None:
+            dir = os.path.dirname(item['path'])
+            filename = os.path.basename(mesh.attrib['filename'])
+            mesh_path = os.path.join(dir, filename)
+            mesh = trimesh.load(mesh_path)
+            min_z = mesh.bounds[0][2]
+            return min_z
+    return 0
 
 
 def initPosAndQuat(items):
@@ -22,11 +51,17 @@ def initPosAndQuat(items):
     for item in items:
         if not item.get('dimensions'):
             item = getOriginalDimensions(item)
-        (_, _, height) = item['dimensions']
+        #(_, _, height) = item['dimensions']
+        #s = item.get('scale', 1.0)
+        #item['pos'] = (0, 0, 0.01 + height * s / 2)
+        #if not item.get('quat'):
+        #    item['quat'] = (0,0,0,1) #pas de rotation
+
+        height_offset = findHeightOffset(item)
         s = item.get('scale', 1.0)
-        item['pos'] = (0, 0, 0.01 + height * s / 2)
+        item['pos'] = (0, 0, 0.01 + height_offset * s)
         if not item.get('quat'):
-            item['quat'] = (0,0,0,1) #pas de rotation
+            item['quat'] = (0,0,0,1) 
     return items
 
 
