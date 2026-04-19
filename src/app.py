@@ -3,13 +3,11 @@ import os
 import shutil
 import subprocess
 import html
-
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QSplitter,QVBoxLayout, QHBoxLayout, QTextBrowser, QLineEdit,QPushButton, QLabel, QFrame, QMessageBox,QFileDialog, QSizePolicy)
 from PyQt6.QtCore import Qt, QThread, QUrl
 from PyQt6.QtGui import QFont, QColor, QPalette
-from pipeline_worker import (RecognitionWorker, PlacementWorker, ModifySceneWorker, IntentWorker,
-                             ImageSceneWorker, SRC_DIR, SCENE_OUTPUT_FILE, objets_list, OBJETS_DIR)
-from scene_3d_view import SceneView3D
+from pipeline_worker import (RecognitionWorker, PlacementWorker, ModifySceneWorker, IntentWorker,ImageSceneWorker, SRC_DIR, SCENE_OUTPUT_FILE, objets_list, OBJETS_DIR)
+from ui.scene_3d_view import SceneView3D
 from conversation_session import ConversationSession
 
 

@@ -1,8 +1,9 @@
 import json
-from promptToJson_auxilieres import objets_list, objects_desc, validate_json_response, validate_matches, URL, OBJETS_DIR, object_rec
+from pipeline.utils.catalogue import objects_desc
+from pipeline.utils.ollama_client import validate_json_response
 
 #--------------------------
-# prompt textuel 
+# prompt textuel
 #--------------------------
 
 # DIMENSION ET QUATERNIONS
@@ -18,7 +19,7 @@ def object_dim_quat(prompt, objet_reconnus):
       "pos": [0.0,0.0,1.07]
       }
   """
-  
+
   catalogue_desc = objects_desc()
 
   system_prompt = f"""You are a strict JSON API. You place 3D objects in a simulation scene.
@@ -71,6 +72,17 @@ def modify_scene(prompt, current_objects_json, objet_reconnus):
   """Modifie une scene existante selon le prompt utilisateur."""
   catalog_desc = objects_desc()
 
+  # convert scene quats from [x,y,z,w] (scipy) to [w,x,y,z] so the LLM sees a consistent format
+  try:
+    scene_data = json.loads(current_objects_json)
+    for obj in scene_data:
+      if "quat" in obj and len(obj["quat"]) == 4:
+        x, y, z, w = obj["quat"]
+        obj["quat"] = [w, x, y, z]
+    current_objects_json = json.dumps(scene_data)
+  except (json.JSONDecodeError, ValueError):
+    pass
+
   objects_info = "\n".join(
     f'- id: "{id_}" | urdf: "{info["urdf"]}" | dimensions: {info["dimensions"]} m'
     for id_, info in objet_reconnus.items()
@@ -122,9 +134,18 @@ def modify_scene(prompt, current_objects_json, objet_reconnus):
     "options": {"temperature": 0}
   }
 
-  result = validate_json_response(payload)
-  return result.get("objects", [])
+  objetsList = validate_json_response(payload).get("objects", [])
 
+  for obj in objetsList:
+    info = objet_reconnus.get(obj.get("id"), {})
+    if not obj.get("path") and info.get("path"):
+      obj["path"] = info["path"]
+    if not obj.get("dimensions") and info.get("dimensions"):
+      obj["dimensions"] = info["dimensions"]
+    if "root" not in obj:
+      obj["root"] = info.get("root", False)
+
+  return objetsList
 
 
 # user_prompt = "je veux un poubelle sur un lave linge "

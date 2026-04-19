@@ -19,7 +19,7 @@ COLORS = [
 
 
 def load_meshes_from_urdf(urdf_path):
-    """Charge tous les meshes visuels d'un URDF et les retourne en une seule liste"""
+    """Charge les meshes visuels du URDF en appliquant les origins de chaque visual."""
     tree = ET.parse(urdf_path)
     root = tree.getroot()
     urdf_dir = os.path.dirname(urdf_path)
@@ -38,6 +38,14 @@ def load_meshes_from_urdf(urdf_path):
                 continue
             try:
                 m = trimesh.load(mesh_path, force='mesh')
+                origin = visual.find('origin')
+                if origin is not None:
+                    xyz = [float(v) for v in origin.get('xyz', '0 0 0').split()]
+                    rpy = [float(v) for v in origin.get('rpy', '0 0 0').split()]
+                    transform = np.eye(4)
+                    transform[:3, :3] = Rotation.from_euler('xyz', rpy).as_matrix()
+                    transform[:3, 3] = xyz
+                    m.apply_transform(transform)
                 meshes.append(m)
             except Exception:
                 continue
@@ -70,6 +78,9 @@ class SceneView3D(gl.GLViewWidget):
 
             if path.endswith('.urdf'):
                 meshes = load_meshes_from_urdf(path)
+            elif path.endswith(('.obj', '.stl', '.ply')):
+                m = trimesh.load(path, force='mesh')
+                meshes = [m] if m is not None else []
             else:
                 continue
             scale = obj.get('scale', 1.0)

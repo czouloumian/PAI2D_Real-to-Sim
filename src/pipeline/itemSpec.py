@@ -10,7 +10,7 @@ def getFilePath(item):
     :param item: le dictionnaire d'item avec id et urdf
     :return path: le path pour l'item
     '''
-    items_folder = os.path.join(os.path.dirname(__file__),'..', 'objets')
+    items_folder = os.path.join(os.path.dirname(__file__),'..', '..', 'objets')
     base = os.path.join(items_folder, item['urdf'])
     if not os.path.exists(base):
         raise FileNotFoundError(f"Pour {item['id']}, le fichier {item['urdf']} est introuvable.")

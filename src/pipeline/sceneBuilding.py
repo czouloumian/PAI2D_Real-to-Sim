@@ -1,7 +1,7 @@
 import os
 import random
-from itemSpec import getOriginalDimensions, getFilePath
-from jsonParsing import simplifyRelations
+from .itemSpec import getOriginalDimensions, getFilePath
+from .jsonParsing import simplifyRelations
 
 
 '''

@@ -1,38 +1,12 @@
-from promptToJson_auxilieres import validate_json_response, object_rec
-import re
+from pipeline.utils.ollama_client import validate_json_response
+from pipeline.utils.helpers import normalize, fuzzy_match
+from pipeline.sceneBuilding import buildScene
 
 #---------------------------------------------------------------------
 # RECONNAITRE LES RELATIONS ENTRE OBJETS
 #---------------------------------------------------------------------
 
 VALID_RELATION_TYPES = {"on", "under", "left_of", "right_of", "in_front_of", "behind", "facing", "against", "inside"}
-
-
-def normalize(s):
-  """Normalise un ID pour le matching flou : minuscules, espaces/tirets/_"""
-  s = s.lower().strip()
-  s = re.sub(r'[-_\s]+', ' ', s)
-  return s
-
-
-def fuzzy_match(raw_id, valid_ids):
-  """Essaie de trouver l'ID valide le plus proche du raw_id retourne par le LLM"""
-  if raw_id in valid_ids:
-    return raw_id
-
-  norm_raw = normalize(raw_id)
-  # "lave-linge" == "lave linge" normalisation
-  for vid in valid_ids:
-    if normalize(vid) == norm_raw:
-      return vid
-
-  # le LLM a peut-etre ajoute/retire des mots cet idiot 
-  for vid in valid_ids:
-    nv = normalize(vid)
-    if nv in norm_raw or norm_raw in nv:
-      return vid
-
-  return None
 
 
 def fix_ids_in_result(result, valid_ids):
@@ -44,7 +18,7 @@ def fix_ids_in_result(result, valid_ids):
   matched_root = fuzzy_match(root, valid_ids)
   if matched_root:
     if matched_root != root:
-      print(f"[object_relations] root '{root}' -> corrigé en '{matched_root}'")
+      print(f"[object_relations] root '{root}' -> corrige en '{matched_root}'")
     result["root"] = matched_root
   else:
     print(f"[object_relations] root '{root}' introuvable, fallback sur '{ids_list[0]}'")
@@ -55,7 +29,7 @@ def fix_ids_in_result(result, valid_ids):
   for rel in result.get("relations", []):
     rel_type = rel.get("type", "")
     if rel_type not in VALID_RELATION_TYPES:
-      print(f"[object_relations] Relation ignorée (type invalide '{rel_type}') : {rel}")
+      print(f"[object_relations] Relation ignoree (type invalide '{rel_type}') : {rel}")
       continue
 
     subj = rel.get("subject", "")
@@ -64,13 +38,13 @@ def fix_ids_in_result(result, valid_ids):
     matched_obj = fuzzy_match(obj, valid_ids)
 
     if not matched_subj or not matched_obj:
-      print(f"[object_relations] Relation ignorée (ID non résolu) : {rel}")
+      print(f"[object_relations] Relation ignoree (ID non resolu) : {rel}")
       continue
 
     if matched_subj != subj:
-      print(f"[object_relations] subject '{subj}' → corrigé en '{matched_subj}'")
+      print(f"[object_relations] subject '{subj}' -> corrige en '{matched_subj}'")
     if matched_obj != obj:
-      print(f"[object_relations] object '{obj}' → corrigé en '{matched_obj}'")
+      print(f"[object_relations] object '{obj}' -> corrige en '{matched_obj}'")
 
     rel["subject"] = matched_subj
     rel["object"] = matched_obj
@@ -79,16 +53,16 @@ def fix_ids_in_result(result, valid_ids):
   result["relations"] = fixed_relations
   return result
 
-objets_test  = {'poubelle': {'urdf': '10357_poubelle', 'path': '/Users/anaisazouaoui/Desktop/PAI2D/projet Real-to-Sim/PAI2D_Real-to-Sim/objets/10357_poubelle', 'dimensions': [1.1516, 1.7345, 1.1516]}, 'refrigerateur': {'urdf': '10143_refrigerateur', 'path': '/Users/anaisazouaoui/Desktop/PAI2D/projet Real-to-Sim/PAI2D_Real-to-Sim/objets/10143_refrigerateur', 'dimensions': [0.8589, 1.5259, 0.9222]}, 'machine à laver': {'urdf': '11826_lave_linge', 'path': '/Users/anaisazouaoui/Desktop/PAI2D/projet Real-to-Sim/PAI2D_Real-to-Sim/objets/11826_lave_linge', 'dimensions': [1.1075, 1.5321, 0.9968]}, 'toaster': {'urdf': '103477_toaster', 'path': '/Users/anaisazouaoui/Desktop/PAI2D/projet Real-to-Sim/PAI2D_Real-to-Sim/objets/103477_toaster', 'dimensions': [1.0363, 1.0794, 1.5112]}}
+
 def scale(prompt,objets_rec):
   """genere les scales des objets relativement"""
   objects_info = "\n".join(
     f'- id: "{id}"| dimensions: {info["dimensions"]} m'
     for id, info in objets_rec.items()
   )
-  
+
   print(["Calcule des scales"])
-  
+
   system_prompt = f"""You are a strict JSON API. You compute realistic scale factors for 3D objects in a simulation scene.
 
   OBJECTS TO SCALE (current URDF dimensions in meters — these are the raw model dimensions, NOT real-world sizes):
@@ -113,6 +87,16 @@ def scale(prompt,objets_rec):
   - door / porte                  : ~0.90 x 0.05 x 2.10 m
   - tap / robinet                 : ~0.10 x 0.10 x 0.20 m
   - chest of drawers / meuble     : ~0.80 x 0.45 x 1.00 m
+  - mug / tasse / cup             : ~0.09 x 0.09 x 0.10 m
+  - banana / banane               : ~0.04 x 0.18 x 0.04 m
+  - apple / pomme                 : ~0.08 x 0.08 x 0.08 m
+  - bottle / bouteille            : ~0.08 x 0.08 x 0.25 m
+  - bowl / bol                    : ~0.16 x 0.16 x 0.08 m
+  - scissors / ciseaux            : ~0.02 x 0.10 x 0.20 m
+  - knife / couteau               : ~0.02 x 0.03 x 0.22 m
+  - plate / assiette              : ~0.26 x 0.26 x 0.03 m
+  - chair / chaise                : ~0.50 x 0.50 x 0.90 m
+  - table                         : ~1.20 x 0.80 x 0.75 m
 
   HOW TO COMPUTE SCALE:
   For each object, find its dominant dimension (longest axis) in the URDF, then:
@@ -163,9 +147,9 @@ def scale(prompt,objets_rec):
     }
 
   scales = validate_json_response(payload)
-  
+
   print(scales)
-  return scales 
+  return scales
 
 
 def object_relations(prompt=None, objets_rec=None):
@@ -243,7 +227,7 @@ def object_relations(prompt=None, objets_rec=None):
 
     result = validate_json_response(payload)
     result = fix_ids_in_result(result, valid_ids)
-    # vérifier que toutes les relations sont valides après correction
+    # verifier que toutes les relations sont valides apres correction
     all_ids_ok = all(
       rel["subject"] in valid_ids and rel["object"] in valid_ids
       for rel in result.get("relations", [])
@@ -254,31 +238,75 @@ def object_relations(prompt=None, objets_rec=None):
     print(f"[object_relations] retry {attempt + 1} — IDs encore invalides")
     user_prompt = prompt + f"\nIMPORTANT: Use ONLY these exact ids: {ids}. Do NOT modify, translate, or change them in any way."
 
-  print(f"[object_relations] Résultat final : {result}")
+  print(f"[object_relations] Resultat final : {result}")
   return result
 
 
-
-def final_json(objets, scales): 
-  
-  dict_obj = objets 
+def final_json(objets, scales):
+  dict_obj = objets
   dict_scales = scales['scales']
-  
-  for key, value in dict_scales.items() :
-    dict_obj[key]["scale"] = value
-    
+  valid_ids = list(dict_obj.keys())
+
+  for key, value in dict_scales.items():
+    matched = fuzzy_match(key, valid_ids)
+    if not matched:
+      print(f"[final_json] scale ignore, ID inconnu: '{key}'")
+      continue
+    if not isinstance(value, (int, float)):
+      print(f"[final_json] scale invalide ({value}) pour '{matched}', fallback 1.0")
+      value = 1.0
+    dims = dict_obj[matched].get("dimensions") or []
+    if any(abs(value - d) < 1e-4 for d in dims):
+      print(f"[final_json] scale suspect ({value}) pour '{matched}' (= une dimension), fallback 1.0")
+      value = 1.0
+    dict_obj[matched]["scale"] = value
+
   return dict_obj
 
 
+def modify_scene(prompt, current_scene_json, objet_reconnus):
+  """V1/V1.1 : meme interface que pipeline_v2_llm.modify_scene.
+  current_scene_json est ignore — V1 re-run le placement complet depuis le prompt."""
+  relations_data = object_relations(prompt, objet_reconnus)
+  root_id = relations_data.get("root", "")
+  relations = relations_data.get("relations", [])
 
-# objets_test  = {'poubelle': {'urdf': '10357_poubelle', 'path': '/Users/anaisazouaoui/Desktop/PAI2D/projet Real-to-Sim/PAI2D_Real-to-Sim/objets/10357_poubelle', 'dimensions': [1.1516, 1.7345, 1.1516]}, 'refrigerateur': {'urdf': '10143_refrigerateur', 'path': '/Users/anaisazouaoui/Desktop/PAI2D/projet Real-to-Sim/PAI2D_Real-to-Sim/objets/10143_refrigerateur', 'dimensions': [0.8589, 1.5259, 0.9222]}, 'machine à laver': {'urdf': '11826_lave_linge', 'path': '/Users/anaisazouaoui/Desktop/PAI2D/projet Real-to-Sim/PAI2D_Real-to-Sim/objets/11826_lave_linge', 'dimensions': [1.1075, 1.5321, 0.9968]}, 'toaster': {'urdf': '103477_toaster', 'path': '/Users/anaisazouaoui/Desktop/PAI2D/projet Real-to-Sim/PAI2D_Real-to-Sim/objets/103477_toaster', 'dimensions': [1.0363, 1.0794, 1.5112]}}
+  scales_result = scale(prompt, objet_reconnus)
+  updated_objets = final_json(objet_reconnus, scales_result)
+
+  items = []
+  for label, info in updated_objets.items():
+    items.append({
+      "id":         label,
+      "urdf":       info["urdf"],
+      "path":       info.get("path", ""),
+      "dimensions": info.get("dimensions"),
+      "scale":      info.get("scale", 1.0),
+      "root":       (label == root_id),
+    })
+
+  if root_id not in updated_objets and items:
+    print(f"[V1] root '{root_id}' introuvable, fallback sur '{items[0]['id']}'")
+    items[0]["root"] = True
+
+  items = buildScene(items, relations, [])
+
+  for item in items:
+    pos = item.get("pos", (0, 0, 0))
+    item["pos"] = list(pos)
+    quat = item.get("quat", (0, 0, 0, 1))
+    x, y, z, w = quat
+    item["quat"] = [w, x, y, z]
+
+  return items
+
+
+# objets_test  = {'poubelle': ..., 'refrigerateur': ..., 'machine a laver': ..., 'toaster': ...}
 # user_prompt = "je veux un poubelle sur un lave linge et derrier un refrigeratuer et une petite machine a laver.  "
-# scales = {'scales': {'poubelle': 0.35, 'refrigerateur': 1.27, 'machine à laver': 0.68}}
+# scales = {'scales': {'poubelle': 0.35, 'refrigerateur': 1.27, 'machine a laver': 0.68}}
 # print(final_json(objets_test, scales))
-
 
 # user_prompt = "je veux un poubelle sur un lave linge "
 # objets_rec, objets_non_rec = object_rec(user_prompt)
 # resultat = object_relations(user_prompt, objets_rec)
 # print(resultat)
-

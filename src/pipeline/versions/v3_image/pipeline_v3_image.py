@@ -5,21 +5,22 @@ import requests
 from collections import defaultdict
 from PIL import Image
 import json
-from promptToJson_auxilieres import URL, object_rec
-from sceneBuilding import initPosAndQuat, processRelations, processOrientations
+from pipeline.utils.ollama_client import URL
+from pipeline.versions.v1_llm_primobject_recognition.object_rec_v1_llm import object_rec
+from pipeline.sceneBuilding import initPosAndQuat, processRelations, processOrientations
 
 RE_JSON = re.compile(r"\{.*\}", re.DOTALL)
 RE_CODE_BLOCK = re.compile(r"```(?:json)?\s*([\s\S]*?)```")
-VISION_TIMEOUT = 600 
+VISION_TIMEOUT = 600
 
-SCENE_WIDTH = 5.0   # les limitations de la scene pour les positions normalisées, on peut changer
-SCENE_DEPTH = 5.0  
+SCENE_WIDTH = 5.0   # les limitations de la scene pour les positions normalisees, on peut changer
+SCENE_DEPTH = 5.0
 
 # Z est difficile a gerer pour les objets qui sont sur d'autre objet donc ces trois relations selont gerer par processRelations
 # les autres (left_of, right_of…) sont gerees par les positions x y norm de l'image
 VERTICAL_RELATIONS = {"on", "under", "inside"}
-RE_SUFFIX = re.compile(r'_\d+$')   
-MAX_IMAGE_SIZE = 640   # px sur le côté le plus long — réduit le temps de l'encodeur vision
+RE_SUFFIX = re.compile(r'_\d+$')
+MAX_IMAGE_SIZE = 640   # px sur le cote le plus long — reduit le temps de l'encodeur vision
 
 def load_images(image_sources):
     """
@@ -53,7 +54,7 @@ def call_vision_llm(images, system_prompt, user_prompt):
         "stream": True,
         "options": {"temperature": 0, "num_predict": 512}
     }
-    print("[call_vision_llm] Envoi requête à Ollama (streaming)...")
+    print("[call_vision_llm] Envoi requete a Ollama (streaming)...")
     response = requests.post(URL, json=payload, stream=True, timeout=VISION_TIMEOUT)
     if response.status_code != 200:
         raise RuntimeError(f"Erreur Ollama vision (HTTP {response.status_code}): {response.text}")
@@ -86,7 +87,7 @@ def call_vision_llm(images, system_prompt, user_prompt):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# ÉTAPE 1 — DÉTECTION VISUELLE + ESTIMATIONS + RELATIONS
+# ETAPE 1 — DETECTION VISUELLE + ESTIMATIONS + RELATIONS
 # ─────────────────────────────────────────────────────────────────────────────
 
 VALID_ORIENTATIONS = { "default", "turn_left", "turn_right", "turn_around","tip_forward", "tip_backward", "tip_left", "tip_right", "upside_down"}
@@ -196,11 +197,11 @@ def remap_relations(relations, label_mapping, valid_labels):
 
 def scene_from_image(image_paths):
     """
-    Génère une scène 3D à partir d'images.
+    Genere une scene 3D a partir d'images.
 
     Pipeline :
       1. Vision LLM  -> objects (label, pos_norm, scale, quat) + relations
-      2. object_rec  -> mapping labels → catalogue
+      2. object_rec  -> mapping labels -> catalogue
       3. initPosAndQuat + processRelations (sceneBuilding) -> z
       4. Override x,y avec les positions derivee de l'image (pos_norm)
 
@@ -214,7 +215,7 @@ def scene_from_image(image_paths):
     detected_relations = detected_raw.get("relations", [])
 
     if not detected_objects:
-        print("[scene_from_image] Aucun objet détecté.")
+        print("[scene_from_image] Aucun objet detecte.")
         return []
 
     # mapping
@@ -239,7 +240,7 @@ def scene_from_image(image_paths):
     for cat_label, info in objet_reconnus.items():
         base = RE_SUFFIX.sub('', cat_label)
         pool = estimates_pool.get(cat_label) or estimates_pool.get(base) or []
-        est  = pool.pop(0) if pool else {} 
+        est  = pool.pop(0) if pool else {}
         vision_label = est.get("label", base)
         label_mapping[vision_label] = cat_label
         item_estimates[cat_label]   = est
@@ -261,7 +262,7 @@ def scene_from_image(image_paths):
         for cat_label, info in objet_reconnus.items()
     ]
 
-    # processOrientations met à jour quat et dimensions
+    # processOrientations met a jour quat et dimensions
     # Doit tourner AVANT initPosAndQuat pour que le z initial soit calcule
     orientations = [
         {"id": cat_label, "turn": item_estimates[cat_label].get("orientation", "default")}

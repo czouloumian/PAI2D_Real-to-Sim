@@ -1,116 +1,14 @@
-import requests
-import json
-import os
-import re
-import functools
-
-OBJETS_DIR = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "objets"))
-URL = "http://localhost:11434/api/generate"
-
-# regexes compilees une seule fois au chargement du module
-RE_JSON = re.compile(r"\{.*\}", re.DOTALL)
-RE_STRIP = re.compile(r'[@#$%^&*\d]')
+from pipeline.utils.catalogue import objets_list, objects_desc
+from pipeline.utils.ollama_client import validate_json_response
 
 
 #---------------------------------------------------------------------
-# fonctions auxilieres
+# RECONNAISSANCE D'OBJETS AVEC PROMPT TEXTUEL
 #---------------------------------------------------------------------
-
-def bounding_box_from_obj(obj_file):
-  "obtenir manuellement la bbox comme les objets ycb on en pas"
-  xs, ys, zs = [], [], []
-  with open(obj_file) as f:
-      for line in f:
-          if line.startswith("v "):
-              v, x, y, z = line.split()
-              xs.append(float(x))
-              ys.append(float(y))
-              zs.append(float(z))
-  if not xs:
-      return None
-  return {"min": [min(xs), min(ys), min(zs)], "max": [max(xs), max(ys), max(zs)]}
-
-
-def get_dimensions(obj_path):
-  "dans le nom sah"
-  bbox_path = os.path.join(obj_path, "bounding_box.json")
-  if not os.path.isfile(bbox_path):
-      # objets YCB : calcul depuis le mesh et sauvegarde pour la prochaine fois
-      google_16k = os.path.join(obj_path, "google_16k")
-      if not os.path.isdir(google_16k):
-          return None
-      obj_file = os.path.join(google_16k, "textured.obj")
-      if not os.path.exists(obj_file):
-          candidates = [f for f in os.listdir(google_16k) if f.endswith(".obj")]
-          if not candidates:
-              return None
-          obj_file = os.path.join(google_16k, candidates[0])
-      bbox = bounding_box_from_obj(obj_file)
-      if bbox is None:
-          return None
-      with open(bbox_path, "w") as f:
-          json.dump(bbox, f)
-      print(f"[get_dimensions] bbox genere pour {os.path.basename(obj_path)}")
-  else:
-      with open(bbox_path) as f:
-          bbox = json.load(f)
-
-  return [round(bbox["max"][i] - bbox["min"][i], 4) for i in range(3)]
-
-
-@functools.lru_cache(maxsize=1)
-def objets_list(dirpath=OBJETS_DIR):
-  """liste des objets avec leur nom, leur dimension, et leur path — cache pour pas refaire le calcule"""
-  result = {}
-  with os.scandir(dirpath) as it:
-    for entry in it:
-      if entry.name.startswith(".") or not entry.is_dir():
-        continue
-      nom_obj = RE_STRIP.sub('', entry.name.replace("_", " "))
-      result[entry.name] = {
-        "name": nom_obj,
-        "path": entry.path,
-        "dimensions": get_dimensions(entry.path)
-      }
-  return result
-
-#print(objets_list(OBJETS_DIR).keys())
-
-
-@functools.lru_cache(maxsize=1)
-def objects_desc(dirpath=OBJETS_DIR):
-  """chaine de description du catalogue — cache pour pas refaire le calcule"""
-  objects_data = objets_list(dirpath)
-  return "\n".join(
-    f'- urdf: "{k}" | nom: "{v["name"].strip()}" | dimensions: {v["dimensions"]} m'
-    for k, v in objects_data.items()
-    if v["dimensions"] is not None
-  )
-
-print(objects_desc(OBJETS_DIR))
-
-def validate_json_response(payload):
-  try:
-    response = requests.post(URL, json=payload, timeout=300)
-  except requests.exceptions.ConnectionError:
-    raise ConnectionError("Impossible de joindre Ollama.")
-
-  if response.status_code != 200:
-    raise RuntimeError(f"Erreur Ollama (HTTP {response.status_code}): {response.text}")
-  raw = response.json().get("response", "")
-
-  json_match = RE_JSON.search(raw)
-  if not json_match:
-    raise ValueError("Le LLM n'a pas retourné de JSON valide")
-  
-  result = json.loads(json_match.group()) # transforme en dictionnaire 
-
-  return result
-
 
 def validate_matches(result, objects_data):
-  """Vérifie par le LLM que chaque mapping label urdf est cohérent
-  Retourne ([(label, urdf), ...] valides, [labels] rejetés)"""
+  """Verifie par le LLM que chaque mapping label urdf est coherent
+  Retourne ([(label, urdf), ...] valides, [labels] rejetes)"""
   reconnus = result.get("obj_reconnus", {})
   matches = [(label, urdf) for label, urdf in reconnus.items() if urdf in objects_data]
   if not matches:
@@ -149,7 +47,7 @@ def validate_matches(result, objects_data):
   }
 
   raw_verdicts = validate_json_response(payload).get("verdicts", [])
-  
+
   # normaliser : le LLM retourne deds fois un bool au lieu d'une liste
   if isinstance(raw_verdicts, bool):
     verdicts = [raw_verdicts]
@@ -164,15 +62,11 @@ def validate_matches(result, objects_data):
     if i < len(verdicts) and verdicts[i]:
       accepted.append((label, urdf))
     else:
-      print(f"[validation] rejeté: '{label}' ≠ '{objects_data[urdf]['name'].strip()}'")
+      print(f"[validation] rejete: '{label}' != '{objects_data[urdf]['name'].strip()}'")
       rejected.append(label)
 
   return accepted, rejected
 
-
-#---------------------------------------------------------------------
-# RECONNAISSANCE D'OBJETS AVEC PROMPT TEXTUEL
-#---------------------------------------------------------------------
 
 def object_rec(prompt=None):
   """
@@ -181,8 +75,8 @@ def object_rec(prompt=None):
 
   retourne : dict des objets reconnus {id: {urdf, path, dimensions}}
   """
-  
-  objects_data = objets_list()  
+
+  objects_data = objets_list()
   valid_urdfs = set(objects_data.keys())
   catalogue_desc = objects_desc()
 
@@ -202,7 +96,7 @@ def object_rec(prompt=None):
 
         Input: "une chaise et un four"
         Output: {{"objets_non_reconnus": ["chaise"], "obj_reconnus": {{"four": "7138_four"}}}}
-        
+
         Input: "deux toasters derriere une machine a laver"
         Output: {{"objets_non_reconnus": [], "obj_reconnus": {{"toaster_1": "103477_toaster","toaster_2": "103477_toaster","machine à laver": "11826_lave_linge"}}}}
 
@@ -249,7 +143,7 @@ def object_rec(prompt=None):
     print(f"[retry {attempt + 1}] urdfs invalides : {invalid}")
     user_prompt = prompt + f"\nPREVIOUS ERROR: these urdfs do not exist: {invalid}. Remove or correct them."
 
-  # Contrôle sémantique : vérifier que chaque label correspond vraiment à l'objet mappé
+  # Controle semantique : verifier que chaque label correspond vraiment a l'objet mappe
   valid_matches, rejected_labels = validate_matches(result, objects_data)
   non_reconnus = result.get("objets_non_reconnus", []) + rejected_labels
 
@@ -265,67 +159,6 @@ def object_rec(prompt=None):
   print("Reconnus:", objet_reconnus)
   print("Non reconnus:", non_reconnus)
   return objet_reconnus, non_reconnus
-
-
-
-
-#---------------------------------------------------------------------
-# SUGGESTION D'ALTERNATIVES
-#---------------------------------------------------------------------
-
-def classify_intent(prompt, scene_summary):
-  """Classifie le prompt en 'modify_scene' ou 'new_scene'."""
-  system_prompt = f"""You classify user instructions about a 3D scene.
-
-        Current scene: {scene_summary}
-
-        If the user wants to MODIFY the existing scene (move, remove, add, rotate, resize objects), return: {{"intent": "modify_scene"}}
-        If the user wants to CREATE a completely new scene (ignoring the current one), return: {{"intent": "new_scene"}}
-
-        Return ONLY raw JSON, no markdown, no comments."""
-
-  payload = {
-    "model": "llama3.1",
-    "system": system_prompt,
-    "prompt": prompt,
-    "stream": False,
-    "format": "json",
-    "options": {"temperature": 0}
-  }
-
-  result = validate_json_response(payload)
-  intent = result.get("intent", "new_scene")
-  return intent if intent in ("modify_scene", "new_scene") else "new_scene"
-
-
-def suggest_alternatives(label):
-  """Propose 2-3 objets du catalogue les plus proches du label non reconnu"""
-  catalog_desc = objects_desc()
-  objects_data = objets_list()
-
-  system_prompt = f"""You suggest the closest alternatives from a 3D object catalogue for an unrecognized object.
-
-        CATALOGUE:
-        {catalog_desc}
-
-        Return ONLY this JSON: {{"alternatives": ["urdf_key_1", "urdf_key_2"]}}
-        - Pick the 2-3 closest matches (same category or similar function)
-        - If nothing is remotely close, return {{"alternatives": []}}
-        - Each value must be an exact urdf key from the catalogue
-        - output raw JSON only, no markdown, no comments"""
-
-  payload = {
-    "model": "llama3.1",
-    "system": system_prompt,
-    "prompt": f'The user asked for: "{label}"',
-    "stream": False,
-    "format": "json",
-    "options": {"temperature": 0}
-  }
-
-  alternatives = validate_json_response(payload)
-  # filtrer les URDFs invalides
-  return [a for a in alternatives if a in objects_data]
 
 
 # premiere phase du prompt : reconnaitre les objets
@@ -362,4 +195,3 @@ def suggest_alternatives(label):
   "pos": [0.0,0.0,1.07]
 }
 """
-

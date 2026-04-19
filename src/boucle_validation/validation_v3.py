@@ -5,7 +5,7 @@ import json
 import re
 import shutil
 from datetime import datetime
-from version2.jsonToSim import create_scene_validation
+from .jsonToSim import create_scene_validation
 from PIL import Image
 
 def getFilePath(itemsList):

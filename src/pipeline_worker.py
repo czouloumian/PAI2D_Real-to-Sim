@@ -1,23 +1,29 @@
 import os
 import json
 import traceback
-
 from PyQt6.QtCore import QObject, pyqtSignal
-from promptToJson_auxilieres import object_rec, objets_list, suggest_alternatives,classify_intent, OBJETS_DIR
-from promptToJson_V2_LLM import object_dim_quat, modify_scene
-from promptToJson_V1_prim import object_relations, scale, final_json
-from sceneBuilding import buildScene
+from pipeline.versions.v1_llm_prim.object_recognition.object_rec_v1_1_embedding import object_rec as _object_rec_v11
+from pipeline.versions.v1_llm_prim.object_recognition.object_rec_v1_llm import object_rec as _object_rec_v1
+from pipeline.utils.catalogue import objets_list, OBJETS_DIR
+from pipeline.utils.ollama_client import suggest_alternatives, classify_intent
+from pipeline.versions.v2_llm_only.pipeline_v2_llm import object_dim_quat, modify_scene as modify_scene_v2
+from pipeline.versions.v1_llm_prim.placement.placement_v1_relations import object_relations, scale, final_json, modify_scene as modify_scene_v1
+from pipeline.sceneBuilding import buildScene
+# "V1"   : object_rec via LLM, placement via sceneBuilding
+# "V1.1" : object_rec via embeddings, placement via sceneBuilding
+# "V2"   : placement et modification 100% LLM direct (sans sceneBuilding)
+PIPELINE_VERSION = "V1.1"
 
-# V1 : placement via relations + sceneBuilding | V2 : LLM calcule direct les coords
-PIPELINE_VERSION = "V1"
+# on choisit object_rec selon la version
+object_rec = _object_rec_v11 if PIPELINE_VERSION == "V1.1" else _object_rec_v1
 
 SRC_DIR = os.path.dirname(os.path.abspath(__file__))
-SCENE_OUTPUT_FILE = os.path.join(SRC_DIR, '..', 'scene_generee.json')
+SCENE_OUTPUT_FILE = os.path.join(SRC_DIR, '..', 'scenes', 'scene_generee.json')
 
 
 def _place_objects(prompt, objet_reconnus, relations_corrigees=None):
     """Place les objets selon la version du pipeline choisie."""
-    if PIPELINE_VERSION == "V1":
+    if PIPELINE_VERSION in ("V1", "V1.1"):
         if relations_corrigees is not None:
             relations_data = relations_corrigees
         else:
@@ -32,11 +38,12 @@ def _place_objects(prompt, objet_reconnus, relations_corrigees=None):
         items = []
         for label, info in objet_reconnus.items():
             items.append({
-                "id": label,
-                "urdf": info["urdf"],
+                "id":         label,
+                "urdf":       info["urdf"],
+                "path":       info.get("path", ""),
                 "dimensions": info.get("dimensions"),
-                "scale": info.get("scale", 1.0),
-                "root": (label == root_id),
+                "scale":      info.get("scale", 1.0),
+                "root":       (label == root_id),
             })
 
         # Si le root retourné ne correspond à aucun item, marquer le premier
@@ -44,7 +51,7 @@ def _place_objects(prompt, objet_reconnus, relations_corrigees=None):
             print(f"[V1] root '{root_id}' introuvable, fallback sur '{items[0]['id']}'")
             items[0]["root"] = True
 
-        items = buildScene(items, relations)
+        items = buildScene(items, relations, [])
 
         for item in items:
             pos = item.get("pos", (0, 0, 0))
@@ -59,40 +66,59 @@ def _place_objects(prompt, objet_reconnus, relations_corrigees=None):
 
 
 def _modify_scene(prompt, current_objects_json, objet_reconnus):
-    """Modifie la scene existante (utilise toujours le LLM direct / V2)."""
-    return modify_scene(prompt, current_objects_json, objet_reconnus)
+    """Modifie la scene selon la version active du pipeline."""
+    if PIPELINE_VERSION in ("V1", "V1.1"):
+        return modify_scene_v1(prompt, current_objects_json, objet_reconnus)
+    else:
+        return modify_scene_v2(prompt, current_objects_json, objet_reconnus)
 
 
 def resolve_urdf_path(path):
-    """Resout le chemin vers le fichier URDF exploitable."""
+    """Resout le chemin vers le fichier exploitable (urdf ou mesh)."""
     if os.path.isfile(path):
         return path
     if os.path.isdir(path):
-        for name in ["mobility.urdf", "kinbody.xml"]:
-            urdf = os.path.join(path, name)
-            if os.path.exists(urdf):
-                return urdf
+        for name in ["mobility.urdf", "kinbody.xml", "textured.obj", "nontextured.stl", "nontextured.ply"]:
+            candidate = os.path.join(path, name)
+            if os.path.exists(candidate):
+                return candidate
+        google_16k = os.path.join(path, "google_16k")
+        if os.path.isdir(google_16k):
+            for name in ["textured.obj", "nontextured.stl", "nontextured.ply"]:
+                candidate = os.path.join(google_16k, name)
+                if os.path.exists(candidate):
+                    return candidate
     return path
 
 
 def postprocess_objects(objetsList, objet_reconnus):
-    """Post-traitement commun : resoudre les paths URDF, convertir les quaternions, sauvegarder"""
+    """Post-traitement commun : resoudre les paths, convertir les quaternions, completer les champs manquants, sauvegarder."""
     print(f"[POSTPROCESS] Post-traitement de {len(objetsList)} objets...")
     for obj in objetsList:
-        # ajouter le path depuis objet_reconnus si absent
-        if "path" not in obj and obj.get("id") in objet_reconnus:
-            obj["path"] = objet_reconnus[obj["id"]]["path"]
-        # resoudre le path vers le fichier .urdf
-        if "path" in obj:
+        info = objet_reconnus.get(obj.get("id"), {})
+
+        # path : ajouter depuis objet_reconnus si absent, puis resoudre vers fichier
+        if not obj.get("path") and info.get("path"):
+            obj["path"] = info["path"]
+        if obj.get("path"):
             obj["path"] = resolve_urdf_path(obj["path"])
-        # le LLM retourne [w,x,y,z], scipy attend [x,y,z,w]
+
+        # dimensions : injecter depuis objet_reconnus si absentes
+        if not obj.get("dimensions") and info.get("dimensions"):
+            obj["dimensions"] = info["dimensions"]
+
+        # root : injecter False si absent (seul le root explicite vaut True)
+        if "root" not in obj:
+            obj["root"] = info.get("root", False)
+
+        # quat : le LLM retourne [w,x,y,z], scipy attend [x,y,z,w]
         if "quat" in obj and len(obj["quat"]) == 4:
             w, x, y, z = obj["quat"]
             obj["quat"] = [x, y, z, w]
 
     with open(SCENE_OUTPUT_FILE, 'w', encoding='utf-8') as f:
         json.dump(objetsList, f, indent=2, ensure_ascii=False)
-    print(f"[POSTPROCESS] JSON sauvegarde → {SCENE_OUTPUT_FILE}")
+    print(f"[POSTPROCESS] JSON sauvegarde -> {SCENE_OUTPUT_FILE}")
 
     return objetsList
 
@@ -195,7 +221,7 @@ class ImageSceneWorker(QObject):
     def run(self):
         try:
             self.status_update.emit("Analyse de l'image en cours (V3)...")
-            from promptToJson_V3_im import scene_from_image
+            from pipeline.pipeline_v3_image import scene_from_image
             objetsList = scene_from_image(self.image_paths)
             if not objetsList:
                 self.error_occurred.emit("Aucun objet reconnu dans l'image.")

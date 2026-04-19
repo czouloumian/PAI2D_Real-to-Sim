@@ -53,3 +53,27 @@ methode de test :
     - bazar d'objets -> hyper complexe
     - 
 
+solution 1: brute 
+solution 2: finetuning 
+solution 2: embedding 
+
+ajout des bounding boxes 
+
+
+- fix la reconnaissace d'objets avec embeddings. 
+- l'utiliser pour v2 et v3 egalement 
+- fine tuner petit llm = reconnaisance d'objets en general dans une phrase 
+                         reconnaisance de relations 
+- boutons (vous voulez de meilleirs resultat, entrainez votre llm ! ;D)
+- gerer les distances 
+- gerer les orientations 
+- ameliorer interface + worker 
+
+- V3 - finetuner un minimum le vlm 
+- utiliser les depth maps 
+
+
+
+- parler du fait qu'on a ajouter de l'aleatoire dans les positions pour avoir des 
+scene un peu diverisifier mais dire qu'on a ajouter distance pour avoir des truc plus 
+repetitif 
