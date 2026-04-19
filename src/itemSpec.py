@@ -19,10 +19,19 @@ def getFilePath(item):
     #TODO: question: pourquoi on cherche d'autres fichiers que mobility.urdf?
     # si c'est un dossier on cherche un fichier qui existe
     if os.path.isdir(base):
+        # objets PartNet : fichiers directement dans le dossier
         for name in ["mobility.urdf", "kinbody.xml", "textured.obj", "nontextured.stl", "nontextured.ply"]:
             path = os.path.join(base, name)
             if os.path.exists(path):
                 return path
+
+        # objets YCB : fichiers dans le sous-dossier google_16k
+        google_16k = os.path.join(base, "google_16k")
+        if os.path.isdir(google_16k):
+            for name in ["textured.obj", "nontextured.stl", "nontextured.ply"]:
+                path = os.path.join(google_16k, name)
+                if os.path.exists(path):
+                    return path
 
         raise FileNotFoundError(f"Aucun fichier exploitable trouvé dans {base}")
 
@@ -31,13 +40,18 @@ def getFilePath(item):
 
 def getOriginalDimensions(item):
     '''
-    Extrait les dimensions de l'item URDF, qui sont dans '<geometry>'
-
-    :param filepath: le path pour le file urdf
-    :return: l'item avec ses dimensions
+    Extrait les dimensions de l'item depuis son fichier (URDF ou mesh direct).
     '''
+    path = item['path']
 
-    tree = ET.parse(item['path']) #lecture du fichier urdf en xml
+    # mesh direct : pas de XML, on prend directement la bounding box
+    if path.endswith(('.obj', '.stl', '.ply')):
+        mesh = trimesh.load(path, force='mesh')
+        bounds = mesh.bounding_box.extents
+        item['dimensions'] = (float(bounds[0]), float(bounds[1]), float(bounds[2]))
+        return item
+
+    tree = ET.parse(path)
     root = tree.getroot()
 
     for geometry in root.iter('geometry'):

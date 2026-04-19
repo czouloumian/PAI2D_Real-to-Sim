@@ -40,7 +40,7 @@ def getRoot(items):
     placed_items = set()
 
     for item in items:
-        if item.get('root') == 'true' or item.get('root') == 'True':
+        if item.get('root') in (True, 'true', 'True'):
             placed_items.add(item['id'])
 
     # fallback : si aucun root explicite, utiliser le premier item
@@ -72,6 +72,8 @@ def changePosFromRel(rel, item, subject):
     subject_w, subject_d, subject_h = [d * s_sub for d in subject['dimensions']]
     (subject_x, subject_y, subject_z) = subject['pos']
 
+    isDistance = False
+    distance = 0
     if rel.get('distance'):
         distance = rel['distance']
         isDistance = True
