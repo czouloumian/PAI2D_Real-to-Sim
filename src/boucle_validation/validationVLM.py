@@ -8,7 +8,9 @@ import trimesh
 import shutil
 from datetime import datetime
 from jsonToSim import create_scene_validation
-#from itemSpec import getOriginalDimensions, getFilePath
+import json
+from scipy.spatial.transform import Rotation as R
+
 
 def getFilePath(item):
     '''
@@ -135,7 +137,130 @@ def clean_reponse(resultat):
         resultat = resultat[start:end]
     return resultat
 
+
 def boucle_vlm(user_prompt, jsonFile, image_path, max_iter=3):
+
+    run_dir = create_run_dir()
+    history = []
+
+    print("Phase 1: fixage sol")
+    with open(jsonFile, 'r') as file:
+        data = json.load(file)
+    itemsList = data.get('objets', [])
+    itemsList = getOriginalDimensions(itemsList)
+    image_path = create_scene_validation(itemsList, fixed=True)
+    save_iteration_scene(image_path, "init", run_dir, "sol", itemsList)
+
+    res = verif_fixage_sol(jsonFile, image_path)
+
+    history.append({
+        'iteration': "init",
+        'phase': "sol",
+        'feedback': res.get('feedback', ''),
+        'corrections': res.get('corrections',''),
+        'valid': res.get('valid', False)
+    })
+    with open(os.path.join(run_dir, 'history.json'), 'w') as f:
+        json.dump(history, f, indent=4)
+
+    if res.get('valid'):
+        print("FIXAGE VALIDE")
+    else:
+        print("FEEDBACK: ", res.get('feedback', 'pas de feedback'))
+        
+    for iter in range(max_iter):
+        score_parfait = True #le score doit etre parfait dans toutes les évaluations pour que la scène soit valide
+        print("ITERATION", iter)
+        print("Phase 2: orientation")
+        with open(jsonFile, 'r') as file:
+            data = json.load(file)
+        itemsList = data.get('objets', [])
+        itemsList = getOriginalDimensions(itemsList)
+
+        image_path = create_scene_validation(itemsList, fixed=True)
+        save_iteration_scene(image_path, iter, run_dir, "orientation", itemsList)
+
+        res = verif_orientation(jsonFile, image_path, user_prompt)
+
+        history.append({
+            'iteration': iter,
+            'phase': "orientation",
+            'feedback': res.get('feedback', ''),
+            'corrections': res.get('corrections',''),
+            'valid': res.get('valid', False)
+        })
+        with open(os.path.join(run_dir, 'history.json'), 'w') as f:
+            json.dump(history, f, indent=4)
+        if res.get('valid'):
+            print("ORIENTATION VALIDE")
+        else:
+            print("FEEDBACK: ", res.get('feedback', 'pas de feedback'))
+            score_parfait = False
+    
+
+        print("Phase 3: Sémantique et collisions")
+        with open(jsonFile, 'r') as file:
+            data = json.load(file)
+        itemsList = data.get('objets', [])
+        itemsList = getOriginalDimensions(itemsList)
+
+        has_overlap = checkOverlap(itemsList)
+        collision_feedback = "overlap detected" if has_overlap else "no overlap"
+        image_path = create_scene_validation(itemsList, fixed=True)
+
+        save_iteration_scene(image_path, iter, run_dir, "etapes", itemsList)
+
+        res = etapes_validation(user_prompt,jsonFile,image_path, collision_feedback)
+
+        history.append({
+            'iteration': iter,
+            'phase': "semantique",
+            'feedback': res.get('feedback', ''),
+            'corrections': res.get('corrections',''),
+            'valid': res.get('valid', False)
+        })
+        with open(os.path.join(run_dir, 'history.json'), 'w') as f:
+            json.dump(history, f, indent=4)
+
+        if res.get("valid")==True:
+            print("scene validée")
+        else:
+            score_parfait = False
+            print("echec: ", res.get("feedback"))
+
+        print("Phase 1: Fixage sol")
+        with open(jsonFile, 'r') as file:
+            data = json.load(file)
+        itemsList = data.get('objets', [])
+        itemsList = getOriginalDimensions(itemsList)
+        image_path = create_scene_validation(itemsList, fixed=True)
+        save_iteration_scene(image_path, iter, run_dir, "sol", itemsList)
+
+        res = verif_fixage_sol(jsonFile, image_path)
+
+        history.append({
+            'iteration': iter,
+            'phase': "sol",
+            'feedback': res.get('feedback', ''),
+            'corrections': res.get('corrections',''),
+            'valid': res.get('valid', False)
+        })
+        with open(os.path.join(run_dir, 'history.json'), 'w') as f:
+            json.dump(history, f, indent=4)
+
+        if res.get('valid'):
+            print("Fixage valide")
+        else:
+            score_parfait = False
+            print("FEEDBACK: ", res.get('feedback', 'pas de feedback'))
+        
+        if score_parfait:
+            return res
+    else:
+        return res
+
+
+def boucle_vlm_old(user_prompt, jsonFile, image_path, max_iter=3):
 
     run_dir = create_run_dir()
     history = []
@@ -154,9 +279,8 @@ def boucle_vlm(user_prompt, jsonFile, image_path, max_iter=3):
         history.append({
             'iteration': iter,
             'feedback': res.get('feedback', ''),
-            'correction': res.get('correction',''),
-            'valid': res.get('valid', False),
-            'reasoning': res.get('reasoning', '')
+            'corrections': res.get('corrections',''),
+            'valid': res.get('valid', False)
         })
         with open(os.path.join(run_dir, 'history.json'), 'w') as f:
             json.dump(history, f, indent=4)
@@ -185,9 +309,8 @@ def boucle_vlm(user_prompt, jsonFile, image_path, max_iter=3):
         history.append({
             'iteration': iter,
             'feedback': res.get('feedback', ''),
-            'correction': res.get('correction',''),
-            'valid': res.get('valid', False),
-            'reasoning': res.get('reasoning', '')
+            'corrections': res.get('corrections',''),
+            'valid': res.get('valid', False)
         })
         with open(os.path.join(run_dir, 'history.json'), 'w') as f:
             json.dump(history, f, indent=4)
@@ -217,9 +340,8 @@ def boucle_vlm(user_prompt, jsonFile, image_path, max_iter=3):
         history.append({
             'iteration': iter,
             'feedback': res.get('feedback', ''),
-            'correction': res.get('correction',''),
-            'valid': res.get('valid', False),
-            'reasoning': res.get('reasoning', '')
+            'corrections': res.get('corrections',''),
+            'valid': res.get('valid', False)
         })
         with open(os.path.join(run_dir, 'history.json'), 'w') as f:
             json.dump(history, f, indent=4)
@@ -244,41 +366,36 @@ def verif_fixage_sol(jsonFile, image_path):
         } 
         for item in data['objets']
     ]
-    prompt = """You are a scene corrector. Your task is to verify if the objects in the scene are properly placed above the ground plane. If any object is clipping into it, correct its position by adjusting only the Z coordinate.
-            You should augment the z coordinate until the object is slightly above the ground plane. The object should NOT touch the ground plane, it should be slightly above it, around 0.01m. If the object is already above the ground plane, do not change its position.
-            You will receive:
-                - The current scene's object's z coordinates, their dimensions and the suggested minimum z to be above the ground plane
-                - a collage containing FOUR images of the same scene:
-                    1. PERSPECTIVE VIEW: General context.
-                    2. TOP-DOWN VIEW: Best for X, Y coordinates and checking if objects are side-by-side.
-                    3. SIDE VIEW: Best for Z coordinate (height) to check if objects are at the right height.
-                    4. SECOND SIDE VIEW: Best for checking if objects are properly placed below the ground plane.
+    prompt = """You are a scene corrector. Your task is to verify if the objects in the scene are properly placed above the ground plane, which is at z=0. If any object is clipping into the ground, correct its position by adjusting only the Z coordinate.
+    The object should NOT touch the ground plane, it should be slightly above it, around 0.001m.
 
-                RULES:
-                - THERE SHOULD BE NO OBJECTS CLIPPING INTO THE GROUND PLANE. If there are, 'valid' is FALSE and you MUST provide corrected Z values for those objects.
-                - ONLY output the JSON object, nothing else
-                - NO markdown, NO backticks, NO explanations before or after
-                - NEVER rename keys, only change values
-                - Always use double quotes for keys and strings
-                - DO NOT change 'id'.
-                - If valid is true, new_scene can be identical to the input
-                - There should NOT be ANY collisions
-                - If objects overlap, 'valid' is FALSE.
-                - DO NOT lower an object if you don't see space between the object and the ground
-                - There should be AT LEAST 0.01m between the lowest point of the object and the ground plane. If there is less,the scene is NOT VALID, increase the Z coordinate until there is at least 0.01m of space.
-                - The suggested minimum z is calculated as the height of the object / 2 + 0.01m, but you can adjust it if you think it is necessary based on the images. The important thing is that there should be no clipping and at least 0.01m of space.
-                    
-            You MUST respond with ONLY this JSON format:
-            {
-                "reasoning": "the mug is clipping into the ground plane in the side view, we need to increase its z coordinate to be above the ground plane",
-                "valid": false,
-                "feedback": "mug is clipping into ground",
-                "corrections": [
-                    {"id": "mug", "z": 0.01},
-                    {"id": "table", "z": 0.375}
-                ]
-            }
-            """
+           You will receive:
+               - The current scene's object's z coordinates, their dimensions and the suggested minimum z to be above the ground plane
+               - a collage containing FOUR images of the same scene:
+                   1. PERSPECTIVE VIEW: General context.
+                   2. TOP-DOWN VIEW: Best for X, Y coordinates and checking if objects are side-by-side.
+                   3. SIDE VIEW: Best for Z coordinate (height) to check if objects are at the right height.
+                   4. SECOND SIDE VIEW: Best for checking if objects are properly placed below the ground plane.
+
+
+               RULES:
+		       - an object is “clipping” if its lowest point is lower than 0.001.
+               - THERE SHOULD BE NO OBJECTS CLIPPING INTO THE GROUND PLANE. If there are, 'valid' is FALSE and you MUST provide corrected Z values for those objects.
+               - ONLY output the JSON object, nothing else
+               - NO markdown, NO backticks, NO explanations before or after
+               - Always use double quotes for keys and strings
+               - DO NOT change 'id'.
+               - DO NOT lower an object if you don't see space between the object and the ground
+               - valid: Set to ‘false’ if ANY object required a Z-adjustment. Set to ‘true’ only if all objects were already correctly positioned.
+                  
+           You MUST respond with ONLY this JSON format:
+           {
+               "valid": boolean,
+               "feedback": "string description of issues found",
+               "corrections": [{"id": "string", "z": float}]
+           }
+           """
+
     resultat = ollama.chat(
         model="llama3.2-vision",
         messages=[
@@ -325,44 +442,37 @@ def verif_orientation(jsonFile, image_path, original_prompt):
         data = json.load(file)
     quat_only = [{'id': item['id'], 'quat': item.get('quat', [0,0,0,1])} for item in data['objets']]
     
-    prompt = """You are an orientation corrector for 3D scenes.
-    Your task is to check if objects are oriented correctly based on the prompt and the image.
-    
-    COORDINATE SYSTEM:
-    - X axis: left/right
-    - Y axis: forward/backward  
-    - Z axis: up/down
-    - Quaternion format: [x, y, z, w] where [0,0,0,1] means no rotation (convention ROS)
-    
-    Common useful rotations:
-    - No rotation: [0, 0, 0, 1]
-    - 90° around Z (turn left): [0, 0, 0.707, 0.707]
-    - 180° around Z (face opposite): [0, 0, 1, 0]
-    - 90° around X (tip forward): [0.707, 0, 0, 0.707]
-    - Lying on side: [0.707, 0, 0, 0.707]
-    
-    You will receive:
-    - The original prompt
-    - The current quaternions for each object
-    - A collage of FOUR views: perspective, top, side, side2
-    
-    RULES:
-    - ONLY change quat if an object is clearly wrongly oriented
-    - Object should be upright unless overwise specified in the prompt.
-    - DO NOT change quat if orientation looks correct
-    - valid is true only if ALL objects have correct orientation
-    - Always use a valid unit quaternion (norm must equal 1)
-    
-    You MUST respond with ONLY this JSON format:
-    {
-        "reasoning": "the mug is lying on its side in the perspective and side views, it should be upright according to the prompt, we need to change its quaternion to make it upright",
-        "valid": true,
-        "feedback": "all objects correctly oriented",
-        "corrections": [
-            {"id": "mug", "quat": [0, 0, 0, 1]},
-            {"id": "banana", "quat": [0.707, 0, 0, 0.707]}
-        ]
-    }"""
+    prompt = """
+        You are a 3D Orientation Specialist. Your task is to analyze a scene and provide corrective Euler rotations (in degrees) for any misaligned objects.
+
+        COORDINATE SYSTEM:
+        - Z-Axis: Up (Vertical)
+        - X-Axis: Left/Right
+        - Y-Axis: Forward/Backward
+
+        OBJECTIVES:
+        1. Ensure objects are upright (bottom on the ground) unless the prompt says otherwise.
+        2. Ensure objects face the logical direction (e.g., a chair facing a table).
+        3. Identify the ABSOLUTE Euler rotation required to reach the correct state.
+
+        RULES:
+        - Use Euler angles in degrees: [rx, ry, rz].
+        - rx: Rotation around X (Pitch/Tilt forward-back).
+        - ry: Rotation around Y (Roll/Tilt side-to-side).
+        - rz: Rotation around Z (Yaw/Heading).
+        - Set "valid" to false if any object needs a change.
+        - Output ONLY raw JSON.
+
+        JSON FORMAT:
+        {
+            "valid": false,
+            "feedback": "The laptop is upside down; rotating 180 degrees on X.",
+            "corrections": [
+                {"id": "laptop", "euler_deg": [180, 0, 0]}
+            ]
+        }
+    """
+
     resultat = ollama.chat(
         model="llama3.2-vision",
         messages=[
@@ -372,15 +482,27 @@ def verif_orientation(jsonFile, image_path, original_prompt):
              'images': [image_path]}
         ]
     )
+
     clean = clean_reponse(resultat['message']['content'])
     try:
         resultat = json.loads(clean)
     except json.JSONDecodeError:
         print("json invalide pour verif orientation")
         return {"valid": True}
-    if 'corrections' in resultat:
-        corrections = {c['id']: c['quat'] for c in resultat['corrections']}
-        correct_json(jsonFile, corrections, 'quat')
+    for corr in resultat['corrections']:
+            obj_id = corr['id']
+            euler = corr['euler_deg'] #rx,ry,rz
+            
+            rot = R.from_euler('xyz', euler, degrees=True)
+            new_quat = rot.as_quat().tolist() # quaternions x, y, z, w
+
+            for item in data['objets']:
+                if item['id'] == obj_id:
+                    item['quat'] = new_quat
+                    print(f"Euler correction applied to {obj_id}: {euler} deg")
+
+    with open(jsonFile, 'w') as file:
+        json.dump(data, file, indent=4)
     return resultat
 
 
@@ -388,35 +510,38 @@ def etapes_validation(original_prompt, jsonFile, image_path, collision_feedback=
     with open(jsonFile, 'r') as file:
         data = json.load(file)
     pos_and_dims = [{'id': item['id'], 'pos': item['pos'], 'dimensions':item['dimensions']} for item in data['objets']]
-    prompt = """You are a scene validator.
-    Check if the scene matches the prompt and if there are collisions.
-    Return corrected positions only.
+    prompt = """ You are a 3D Scene Validator and Spatial Coordinator. Your goal is to ensure objects are logically placed, match the prompt's description, and do not collide (overlap) with each other or the ground.
 
-    You will receive:
-        - The current scene as a JSON object
-        - The position and dimensions of each object
-        - a collage containing THREE images of the same scene:
-            1. PERSPECTIVE VIEW: General context.
-            2. TOP-DOWN VIEW: Best for X, Y coordinates and checking if objects are side-by-side.
-            3. SIDE VIEW: Best for Z coordinate (height) to check if objects are at the right height.
-    
-    You MUST respond with ONLY this JSON format:
-    {
-        "reasoning": "the mug is too far to the left in the top-down view, it should be closer to the center to be on the table as specified in the prompt, we need to adjust its x coordinate",
-        "valid": true,
-        "feedback": "scene matches prompt",
-        "corrections": [
-            {"id": "mug", "pos": [0.3, 0.0, 0.5]},
-            {"id": "table", "pos": [0.0, 0.0, 0.375]}
-        ]
-    }
+            You will receive:
+                - The current scene as a JSON object
+                - The position and dimensions of each object
+                - a collage containing THREE images of the same scene:
+                    1. PERSPECTIVE VIEW: General context.
+                    2. TOP-DOWN VIEW: Best for X, Y coordinates and checking if objects are side-by-side.
+                    3. SIDE VIEW: Best for Z coordinate (height) to check if objects are at the right height.
+                        
+            Spatial RULES:
+            - Stacking (On Top): For Object A to be "on" Object B, X and Y must be within the space covered by object B. 
+            Object A's lowest point must be 0.001 higher than object B highest point.
+            - Next to: for object A to be next to object B, they must have the same height (Z). X and Y may vary depending on if they are at the right, left, in front, behind each other… For example, if the prompt says "Object A is next to Object B", ensure they have the same Z-base but different X or Y.
+            - Collisions: Objects must not occupy the same space. If they overlap in the Top-Down view, they must have different Z-heights to avoid clipping. If an object is explicitly inside another, this does not apply. However, meshes still shouldn’t intersect.
+            - Ground Plane: No object's lowest point should be below 0.
 
-    RULES:
-    - ONLY change pos if needed
-    - valid is true only if scene matches prompt AND no collisions
-    - DO NOT have objects that clip into the ground
-    - For objects to be on top of another, you have to adjust the x and y so that they are similar, and the z of the object on top for it to be higher than the height of the other object.
-    """
+            Other RULES:
+                - ONLY change pos if needed
+                -  Maintain the original id for all objects.
+                - valid is true only if scene matches prompt AND no collisions
+                - ONLY output the JSON object, nothing else
+                - NO markdown, NO backticks, NO explanations before or after
+
+
+            You MUST respond with ONLY this JSON format:
+            {
+                "valid": boolean,
+                "feedback":  "Reasoning for changes (e.g., 'Moving mug to be centered on table and fixing ground clipping')",
+                "corrections": [{"id": "string", "pos": [x, y, z]}]
+            }
+   """
 
     resultat = ollama.chat(
         model="llama3.2-vision",

@@ -125,7 +125,7 @@ def boucle_vlm(user_img, jsonFile, max_iter=5):
         history.append({
             'iteration': iter,
             'feedback': resultat.get('feedback', ''),
-            'correction': resultat.get('correction',''),
+            'corrections': resultat.get('corrections',''),
             'valid': resultat.get('valid', False)
         })
         with open(os.path.join(run_dir, 'history.json'), 'w') as f:
