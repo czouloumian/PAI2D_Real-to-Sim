@@ -14,8 +14,15 @@ https://genesis-world.readthedocs.io/en/latest/user_guide/getting_started/conven
 
 
 def findHeightOffset(item):
-    tree = ET.parse(item['path'])
+    urdf_path = os.path.abspath(item['path'])
+    if not os.path.exists(urdf_path):
+        print(f"Erreur : URDF non trouvé à {urdf_path}")
+        return 0
+    
+    tree = ET.parse(urdf_path)
     root = tree.getroot()
+    urdf_dir = os.path.dirname(urdf_path)
+
     for geometry in root.iter('geometry'):
         box= geometry.find('box')
         if box is not None:
@@ -31,12 +38,23 @@ def findHeightOffset(item):
             return -h
         mesh = geometry.find('mesh')
         if mesh is not None:
-            dir = os.path.dirname(item['path'])
-            filename = os.path.basename(mesh.attrib['filename'])
-            mesh_path = os.path.join(dir, filename)
-            mesh = trimesh.load(mesh_path)
-            min_z = mesh.bounds[0][2]
-            return min_z
+            filename = mesh.attrib['filename']
+            if filename.startswith('package://'):
+                filename = filename.replace('package://', '')
+            mesh_path = os.path.abspath(os.path.join(urdf_dir, filename))
+            if not os.path.exists(mesh_path):
+                print(f"mesh introuvable : {mesh_path}")
+                return 0    
+            try:
+                mesh_data = trimesh.load(mesh_path)
+                if isinstance(mesh_data, trimesh.Scene):
+                    min_z = mesh_data.bounds[0][2]
+                else:
+                    min_z = mesh_data.bounds[0][2]
+                return min_z
+            except Exception as e:
+                print(f"erreur trimesh sur {mesh_path}: {e}")
+                return 0
     return 0
 
 
