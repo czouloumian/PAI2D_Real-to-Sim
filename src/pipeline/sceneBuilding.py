@@ -59,9 +59,11 @@ def initPosAndQuat(items):
 
         height_offset = findHeightOffset(item)
         s = item.get('scale', 1.0)
-        item['pos'] = (0, 0, 0.01 + height_offset * s)
+        item['pos'] = [0, 0, 0.01 + height_offset * s]
         if not item.get('quat'):
-            item['quat'] = (0,0,0,1) 
+            item['quat'] = [0,0,0,1] 
+        
+        item['parent_id'] = None 
     return items
 
 
@@ -75,7 +77,7 @@ def getRoot(items):
     placed_items = set()
 
     for item in items:
-        if item.get('root') in (True, 'true', 'True'):
+        if item.get('root').lower() == 'true':
             placed_items.add(item['id'])
 
     # fallback : si aucun root explicite, utiliser le premier item
@@ -90,17 +92,141 @@ def getRoot(items):
     return placed_items
 
 
-def changePosFromRel(rel, item, subject):
-    '''
-    Change les données de positions du sujet en fonction de la relation et de l'item déjà placé
+def build_scene_graph(items_dict, relations):
+    """Fait l'arbre des dépendances pour savoir quel objet est sur quel autre objet."""
+    #liens explicites
+    for rel in relations:
+        if rel['type'] in ['on', 'inside']:
+            obj_id = rel['object']
+            sub_id = rel['subject']
+            if sub_id in items_dict and obj_id in items_dict:
+                items_dict[sub_id]['parent_id'] = obj_id
 
-    '''
+    #propagation des liens: si un objet est à coté d'un objet qui 
+    changed = True
+    while changed: #il peut y avoir des chaines de relation donc c'est au cas ou ce soit le cas
+        changed = False
+        for rel in relations:
+            if rel['type'] not in ['on', 'inside']:
+                obj_id = rel['object']
+                sub_id = rel['subject']
+                if sub_id in items_dict and obj_id in items_dict:
+                    obj_parent = items_dict[obj_id].get('parent_id')
+                    sub_parent = items_dict[sub_id].get('parentt_id')
+                    #héritance des parents;
+                    if obj_parent is not None and sub_parent is None:
+                        items_dict[sub_id]['parent_id'] = obj_parent
+                        changed = True
+
+def parent_bound(item, parent_item):
+    """
+    Fait en sorte que l'objet ne dépasse pas les limites de son parent (ex: le mug qui est sur la table a des x,y compris dans les dimensions du plateau de la table)
+    """
+    if not parent_item: 
+        return
+    px, py, pz = parent_item['pos']
+    p_scale = parent_item.get('scale', 1.0)
+    pw, pd, ph = [d * s_scale for d in parent_item['dimensions']]
+    ix, iy, iz = item['pos']
+    i_scale = item.get('scale', 1.0)
+    iw, id, ih = [d * i_scale for d in item['dimensions']]
+
+    #limites du paren: (TODO: ATTENTION FAUT REVOIR APRES POUR QUAND C'EST PAS AU CENTRE)
+    min_x = px - pw/2 + iw/2
+    max_x = px + pw/2 - iw/2
+    min_y = py - pd/2 + id/2
+    max_y = py + pd/2 - id/2
+    if min_x > max_x: #cas où l'objet est plus grand que son parent: on le centre sur le parent pour essayer de faire en sorte qu'il ne tombe pas
+        min_x = max_x = px
+    if min_y > max_y: 
+        min_y = max_y = py
+
+    item['pos'][0] = max(min_x, min(ix, max_x))
+    item['pos'][1] = max(min_y, min(iy, max_y))
+
+def apply_relation(rel, item, subject):
+    """calcul de la nouvelle pos"""
+    s_item = item.get('scale', 1.0)
+    s_sub = subject.get('scale', 1.0)
+    w, d, h = [dim * s_item for dim in item['dimensions']]
+    sw, sd, sh = [dim * s_sub for dim in subject['dimensions']]
+    x, y, z = item['pos']
+    isDistance = 'distance' in rel
+    distance = rel.get('distance', 0)
+    rel_type = rel['type']
+    new_x, new_y, new_z = subject['pos']
+    if rel_type == 'on':
+        new_z = z + h/2 + 0.001
+        new_x = x + random.uniform(-w/2 + sw/2, w/2 - sw/2)
+        new_y = y + random.uniform(-d/2 + sd/2, d/2 - sd/2)
+    elif rel_type == 'inside':
+        new_x, new_y, new_z = x, y, z
+    elif rel_type in ['right_of', 'left_of', 'in_front_of', 'behind']:
+        new_z = z - sw/2 + w/2
+        offset = distance if isDistance else random.uniform(0.05, 0.2)
+        if rel_type == 'right_of':
+            new_x = x
+            new_y = y + d/2 + sd/2 + offset
+        elif rel_type == 'left_of':
+            new_x = x
+            new_y = y - d/2 - sd/2 - offset
+        elif rel_type == 'in_front_of':
+            new_x = x + w/2 + sw/2 + offset
+            new_y = y
+        elif rel_type == 'behind':
+            new_x = x - w/2 - sw/2 - offset
+            new_y = y
+        elif rel_type == 'against':
+            new_x = x + w/2 + sw/2 + 0.01
+            new_y = y
+    else:
+        print(f"Relation non traitée: {rel_type}")
+
+    subject['pos'] = [new_x, new_y, new_z]
+
+
+def processRelations(items, relations): #TODO celui là c'est la nouvelle version
+    items_dict = {item['id']: item for item in items}
+    placed_items = getRoot(items)
+    relations = simplifyRelations(relations)
+    build_scene_graph(items_dict, relations)
+    relations.sort(key=lambda r: 0 if r['type'] in ['on', 'inside'] else 1)
+    reste = [rel for rel in relations if rel.get('object') in items_dict and rel.get('subject') in items_dict]
+    while reste:
+        progression = False
+        for rel in reste[:]:
+            obj_id = rel['object']
+            sub_id = rel['subject']
+            if obj_id in placed_items:
+                item = items_dict[obj_id]
+                subject = items_dict[sub_id]
+                apply_relation(rel, item, subject)
+                parent_id = subject.get('parent_id')
+                if parent_id and parent_id in items_dict:
+                    parent_bound(subject, items_dict[parent_id])
+                placed_items.add(sub_id)
+                reste.remove(rel)
+                progression = True
+        if not progression:
+            print(f"[sceneBuilding] Relations impossibles à résoudre, ignorées : {reste}")
+            break
+    # for item in items:
+    #     item['pos'] = tuple(item['pos'])
+    return items
+
+
+def changePosFromRel(rel, item, subject):
+
     processed = True
     if not item.get('dimensions'):
         item = getOriginalDimensions(item)
+    if not subject.get('dimensions'):
+        subject = getOriginalDimensions(subject)
     s_item = item.get('scale', 1.0)
+    s_sub = subject.get('scale', 1.0)
     width, depth, height = [d * s_item for d in item['dimensions']]
-    (x,y,z) = item['pos']
+    sw, sd, sh = [dim * s_sub for dim in subject['dimensions']]
+    x,y,x = item['pos']
     if not subject.get('dimensions'):
         subject = getOriginalDimensions(subject)
     s_sub = subject.get('scale', 1.0)
@@ -153,16 +279,16 @@ def changePosFromRel(rel, item, subject):
         subject_x = x
         subject_y = y
         subject_z = z 
-    elif rel['type'] == 'facing':
-        if isDistance:
-            subject_x = x + width/2 + subject_w/2 + distance
-        else:
-            subject_x = x + width/2 + subject_w/2 + random.uniform(0.1, 0.4)
-        subject_y = y
-        subject_z = z
-        qx, qy, qz, qw = subject.get('quat', [0, 0, 0, 1])
-        new_quat = [-qy, qx, qw, -qz] 
-        subject['quat'] = new_quat
+    # elif rel['type'] == 'facing':
+    #     if isDistance:
+    #         subject_x = x + width/2 + subject_w/2 + distance
+    #     else:
+    #         subject_x = x + width/2 + subject_w/2 + random.uniform(0.1, 0.4)
+    #     subject_y = y
+    #     subject_z = z
+    #     qx, qy, qz, qw = subject.get('quat', [0, 0, 0, 1])
+    #     new_quat = [-qy, qx, qw, -qz] 
+    #     subject['quat'] = new_quat
     else:
         print("relation non traitée: ", rel['type'])
     subject['pos'] = (subject_x, subject_y, subject_z)
@@ -209,45 +335,45 @@ def changeQuatAndPosFromTurn(turn, item):
     return item
 
 
-def processRelations(items, relations):
-    '''
-    Adapte les coordonnees x,y,z des items en fonction des relations.
+# def processRelations(items, relations):
+#     '''
+#     Adapte les coordonnees x,y,z des items en fonction des relations.
 
-    :param items: liste de dict d'items
-    :param relations: les relations entre les items
-    :return: items, les items avec les bonnes coordonnées et les bonnes 
-    '''
+#     :param items: liste de dict d'items
+#     :param relations: les relations entre les items
+#     :return: items, les items avec les bonnes coordonnées et les bonnes 
+#     '''
 
-    items_dict = {item['id']: item for item in items} #pour pouvoir acceder aux differents items plus facilement
+#     items_dict = {item['id']: item for item in items} #pour pouvoir acceder aux differents items plus facilement
 
-    placed_items = getRoot(items)
+#     placed_items = getRoot(items)
     
-    relations = simplifyRelations(relations)
+#     relations = simplifyRelations(relations)
 
-    reste = [rel for rel in relations if rel.get('object', '') in items_dict and rel.get('subject', '') in items_dict]
+    # reste = [rel for rel in relations if rel.get('object', '') in items_dict and rel.get('subject', '') in items_dict]
 
-    while reste:
-        progression = False
-        for rel in reste[:]:
-            item_id = rel['object']
-            subject_id = rel['subject']
-            if item_id not in items_dict:
-                print(f"ATTENTION: ID objet inconnu dans relation: '{item_id}'")
-            if subject_id not in items_dict:
-                print(f"ATTENTION: ID objet inconnu dans relation: '{subject_id}'")
-            item = items_dict[item_id]
-            subject = items_dict[subject_id]
-            if item_id not in placed_items:
-                continue
-            else:
-                changePosFromRel(rel, item, subject)
-                placed_items.add(subject_id)
-                reste.remove(rel)
-                progression = True
-        if not progression:
-            print(f"[sceneBuilding] Relations impossibles à résoudre, ignorées : {reste}")
-            break
-    return items
+    # while reste:
+    #     progression = False
+    #     for rel in reste[:]:
+    #         item_id = rel['object']
+    #         subject_id = rel['subject']
+    #         if item_id not in items_dict:
+    #             print(f"ATTENTION: ID objet inconnu dans relation: '{item_id}'")
+    #         if subject_id not in items_dict:
+    #             print(f"ATTENTION: ID objet inconnu dans relation: '{subject_id}'")
+    #         item = items_dict[item_id]
+    #         subject = items_dict[subject_id]
+    #         if item_id not in placed_items:
+    #             continue
+    #         else:
+    #             changePosFromRel(rel, item, subject)
+    #             placed_items.add(subject_id)
+    #             reste.remove(rel)
+    #             progression = True
+    #     if not progression:
+    #         print(f"[sceneBuilding] Relations impossibles à résoudre, ignorées : {reste}")
+    #         break
+    # return items
 
 
 def processOrientations(items,orientations):
