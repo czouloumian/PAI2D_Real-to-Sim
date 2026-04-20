@@ -127,15 +127,26 @@ def correct_json(jsonFile, corrections, field):
 
 
 def clean_reponse(resultat):
-    resultat = re.sub(r'```json|```', '', resultat) 
-    resultat = resultat.strip()
-    resultat = resultat.replace("'", '"') 
-    resultat = resultat.replace('True', 'true').replace('False', 'false')
+    # resultat = re.sub(r'```json|```', '', resultat) 
+    # resultat = resultat.strip()
+    # resultat = resultat.replace("'", '"') 
+    # resultat = resultat.replace('True', 'true').replace('False', 'false')
+    # start = resultat.find('{')
+    # end = resultat.rfind('}') + 1
+    # if start != -1 and end != 0:
+    #     resultat = resultat[start:end]
+    # return resultat
+
+
+    resultat = re.sub(r'```', '', resultat)
     start = resultat.find('{')
     end = resultat.rfind('}') + 1
     if start != -1 and end != 0:
-        resultat = resultat[start:end]
-    return resultat
+        json_str = resultat[start:end]
+        json_str = json_str.replace('True', 'true').replace('False', 'false') 
+        return json_str
+    
+    return ""
 
 
 def boucle_vlm(user_prompt, jsonFile, image_path, max_iter=3):
@@ -437,7 +448,8 @@ def verif_fixage_sol(jsonFile, image_path):
     return resultat
 
 
-def verif_orientation(jsonFile, image_path, original_prompt):
+def verif_orientation(jsonFile, image_path, original_prompt): 
+    #TODO: voir si ça change depuis la position initial ou depuis les rotations qu'il y avait déjà    
     with open(jsonFile, 'r') as file:
         data = json.load(file)
     quat_only = [{'id': item['id'], 'quat': item.get('quat', [0,0,0,1])} for item in data['objets']]
