@@ -18,7 +18,7 @@ def create_scene(objetsList):
     '''
     gs.init(backend=gs.cpu)
 
-    scene = gs.Scene(show_viewer=True)
+    scene = gs.Scene(show_viewer=True,vis_options=gs.options.VisOptions(show_world_frame=True,show_link_frame=True))
 
     plane = scene.add_entity(gs.morphs.Plane())
 
@@ -30,7 +30,7 @@ def create_scene(objetsList):
                 pos=obj['pos'], 
                 quat=obj.get('quat', [0.0, 1.0, 1.0, 0.0]),
                 scale=obj.get('scale', 1.0),
-                fixed=True
+                fixed=False
             ),
             material=gs.materials.Rigid(rho=1000),
         )
@@ -53,7 +53,10 @@ def create_scene_validation(objetsList, fixed=False):
 
     gs.init(backend=gs.cpu)
 
-    scene = gs.Scene(show_viewer=False, sim_options=gs.options.SimOptions(dt=0.01), viewer_options=gs.options.ViewerOptions(res=(640, 480)))
+    scene = gs.Scene(show_viewer=False, sim_options=gs.options.SimOptions(dt=0.01), 
+                     viewer_options=gs.options.ViewerOptions(res=(640, 480)),
+                     vis_options=gs.options.VisOptions(show_world_frame=True,show_link_frame=True)
+                     )
 
     plane = scene.add_entity(gs.morphs.Plane()) #la ground plaine
 

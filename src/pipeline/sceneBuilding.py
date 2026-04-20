@@ -122,7 +122,7 @@ def build_scene_graph(items_dict, relations):
 
     #propagation des liens: si un objet est à coté d'un objet qui 
     changed = True
-    while changed: #il peut y avoir des chaines de relation donc c'est au cas ou ce soit le cas
+    for _ in range(10): #il peut y avoir des chaines de relation donc c'est au cas ou ce soit le cas
         changed = False
         for rel in relations:
             if rel['type'] not in ['on', 'inside']:
@@ -130,11 +130,16 @@ def build_scene_graph(items_dict, relations):
                 sub_id = rel['subject']
                 if sub_id in items_dict and obj_id in items_dict:
                     obj_parent = items_dict[obj_id].get('parent_id')
-                    sub_parent = items_dict[sub_id].get('parentt_id')
+                    sub_parent = items_dict[sub_id].get('parent_id')
                     #héritance des parents;
                     if obj_parent is not None and sub_parent is None:
                         items_dict[sub_id]['parent_id'] = obj_parent
                         changed = True
+                    if sub_parent is not None and obj_parent is None:
+                        items_dict[obj_id]['parent_id'] = sub_parent
+                        changed = True
+        if not changed:
+            break
 
 def parent_bound(item, parent_item):
     """
@@ -144,7 +149,7 @@ def parent_bound(item, parent_item):
         return
     px, py, pz = parent_item['pos']
     p_scale = parent_item.get('scale', 1.0)
-    pw, pd, ph = [d * s_scale for d in parent_item['dimensions']]
+    pw, pd, ph = [d * p_scale for d in parent_item['dimensions']]
     ix, iy, iz = item['pos']
     i_scale = item.get('scale', 1.0)
     iw, id, ih = [d * i_scale for d in item['dimensions']]

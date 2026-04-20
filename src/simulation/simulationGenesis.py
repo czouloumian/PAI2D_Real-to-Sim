@@ -118,6 +118,10 @@ def create_scene(objetsList):
             dt=0.005,
             integrator=gs.integrator.Euler,
         ),
+        vis_options=gs.options.VisOptions(
+            show_world_frame=True,
+            show_link_frame=True,
+        )
     )
     scene.add_entity(gs.morphs.Plane())
 

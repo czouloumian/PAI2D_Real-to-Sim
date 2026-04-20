@@ -1,0 +1,20 @@
+{
+  "objets": [
+    {"id": "table", "urdf": "table.urdf", "root": "true"},
+    {"id": "mug", "urdf": "ycb_mug.urdf", "root": "false"},
+    {"id": "banane", "urdf": "011_banane/google_16k/model.urdf", "root": "false"},
+    {"id": "ciseaux", "urdf": "037_ciseaux/google_16k/model.urdf", "root": "false"},
+    {"id": "perceuse", "urdf": "035_perceuse/google_16k/model.urdf", "root": "false"}
+  ],
+  "relations": [
+    {"type": "on", "subject": "mug", "object": "table"},
+    {"type": "on", "subject": "banane", "object": "table"},
+    {"type": "on", "subject": "perceuse", "object": "table"},
+    {"type": "right_of", "subject": "ciseaux", "object": "mug"},
+    {"type": "right_of", "subject": "banane", "object": "ciseaux","distance": 0.15},
+    {"type": "behind", "subject": "perceuse", "object": "mug"}
+  ],
+  "orientations": [
+    {"id": "banane", "turn": "tip_right"}
+  ]
+}
