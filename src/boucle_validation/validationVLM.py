@@ -10,7 +10,7 @@ from datetime import datetime
 from jsonToSim import create_scene_validation
 import json
 from scipy.spatial.transform import Rotation as R
-
+import copy
 
 def getFilePath(item):
     '''
@@ -127,10 +127,10 @@ def correct_json(jsonFile, corrections, field):
 
 
 def clean_reponse(resultat):
-    # resultat = re.sub(r'```json|```', '', resultat) 
-    # resultat = resultat.strip()
-    # resultat = resultat.replace("'", '"') 
-    # resultat = resultat.replace('True', 'true').replace('False', 'false')
+    # #resultat = re.sub(r'```json|```', '', resultat) 
+    # #resultat = resultat.strip()
+    # #resultat = resultat.replace("'", '"') 
+    # #resultat = resultat.replace('True', 'true').replace('False', 'false')
     # start = resultat.find('{')
     # end = resultat.rfind('}') + 1
     # if start != -1 and end != 0:
@@ -149,7 +149,7 @@ def clean_reponse(resultat):
     return ""
 
 
-def boucle_vlm(user_prompt, jsonFile, image_path, max_iter=3):
+def boucle_vlm(user_prompt, jsonFile, max_iter=3):
 
     run_dir = create_run_dir()
     history = []
@@ -193,6 +193,8 @@ def boucle_vlm(user_prompt, jsonFile, image_path, max_iter=3):
 
         res = verif_orientation(jsonFile, image_path, user_prompt)
 
+        print(f"DEBUG: les res keys sont {res.keys()} et le contenu est {res}")
+
         history.append({
             'iteration': iter,
             'phase': "orientation",
@@ -217,19 +219,21 @@ def boucle_vlm(user_prompt, jsonFile, image_path, max_iter=3):
 
         has_overlap = checkOverlap(itemsList)
         collision_feedback = "overlap detected" if has_overlap else "no overlap"
-        image_path = create_scene_validation(itemsList, fixed=True)
+        image_path = create_scene_validation(itemsList, fixed=False)
 
         save_iteration_scene(image_path, iter, run_dir, "etapes", itemsList)
 
         res = etapes_validation(user_prompt,jsonFile,image_path, collision_feedback)
 
-        history.append({
+        print(f"DEBUG: les res keys sont {res.keys()} et le contenu est {res}")
+
+        history.append(copy.deepcopy({
             'iteration': iter,
             'phase': "semantique",
             'feedback': res.get('feedback', ''),
             'corrections': res.get('corrections',''),
             'valid': res.get('valid', False)
-        })
+        }))
         with open(os.path.join(run_dir, 'history.json'), 'w') as f:
             json.dump(history, f, indent=4)
 
@@ -248,6 +252,8 @@ def boucle_vlm(user_prompt, jsonFile, image_path, max_iter=3):
         save_iteration_scene(image_path, iter, run_dir, "sol", itemsList)
 
         res = verif_fixage_sol(jsonFile, image_path)
+        print(f"DEBUG: les res keys sont {res.keys()} et le contenu est {res}")
+
 
         history.append({
             'iteration': iter,
@@ -408,7 +414,7 @@ def verif_fixage_sol(jsonFile, image_path):
            """
 
     resultat = ollama.chat(
-        model="llama3.2-vision",
+        model="llama3.2-vision:11b",
         messages=[
             {'role': 'system', 'content': prompt},
             {'role': 'user', 
@@ -486,7 +492,7 @@ def verif_orientation(jsonFile, image_path, original_prompt):
     """
 
     resultat = ollama.chat(
-        model="llama3.2-vision",
+        model="llama3.2-vision:11b",
         messages=[
             {'role': 'system', 'content': prompt},
             {'role': 'user',
@@ -538,6 +544,7 @@ def etapes_validation(original_prompt, jsonFile, image_path, collision_feedback=
             - Next to: for object A to be next to object B, they must have the same height (Z). X and Y may vary depending on if they are at the right, left, in front, behind each other… For example, if the prompt says "Object A is next to Object B", ensure they have the same Z-base but different X or Y.
             - Collisions: Objects must not occupy the same space. If they overlap in the Top-Down view, they must have different Z-heights to avoid clipping. If an object is explicitly inside another, this does not apply. However, meshes still shouldn’t intersect.
             - Ground Plane: No object's lowest point should be below 0.
+            - DO NOT throw objects in the air! Objects should be placed on a surface (ground or other objects).
 
             Other RULES:
                 - ONLY change pos if needed
@@ -556,7 +563,7 @@ def etapes_validation(original_prompt, jsonFile, image_path, collision_feedback=
    """
 
     resultat = ollama.chat(
-        model="llama3.2-vision",
+        model="qwen2.5vl:3b",
         messages=[
             {'role': 'system', 'content': prompt},
             {'role': 'user',

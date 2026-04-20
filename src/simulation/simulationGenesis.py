@@ -132,7 +132,7 @@ def create_scene(objetsList):
         else:
             path = mesh_to_urdf(path)
 
-        morph = gs.morphs.URDF(file=path, pos=pos, quat=quat, scale=scale)
+        morph = gs.morphs.URDF(file=path, pos=pos, quat=quat, scale=scale, fixed=False)
         scene.add_entity(morph, material=gs.materials.Rigid(rho=1000, friction=0.5))
 
     scene.build()

@@ -1,6 +1,6 @@
 import genesis as gs
 import os
-from PIL import Image, ImageFont #https://pillow.readthedocs.io/en/stable/
+from PIL import Image, ImageDraw, ImageFont #https://pillow.readthedocs.io/en/stable/
 
 #TODO
 #prendre le truc pour lire le JSON et extraire les infos des objets
@@ -16,7 +16,7 @@ def create_scene(objetsList):
 
     :param objets: une liste de dictionnaires des infos pour chaque objet (id, urdf, path, pos)
     '''
-    gs.init(backend=gs.cuda)
+    gs.init(backend=gs.cpu)
 
     scene = gs.Scene(show_viewer=True)
 
@@ -51,9 +51,9 @@ def create_scene_validation(objetsList, fixed=False):
     :return: le chemin vers le screenshot de la scène générée
     '''
 
-    gs.init(backend=gs.cuda)
+    gs.init(backend=gs.cpu)
 
-    scene = gs.Scene(show_viewer=False, sim_options=gs.options.SimOptions(dt=0.01))
+    scene = gs.Scene(show_viewer=False, sim_options=gs.options.SimOptions(dt=0.01), viewer_options=gs.options.ViewerOptions(res=(640, 480)))
 
     plane = scene.add_entity(gs.morphs.Plane()) #la ground plaine
 
@@ -80,8 +80,8 @@ def create_scene_validation(objetsList, fixed=False):
 
     scene.build()
 
-    for i in range(150):
-        scene.step()
+    #for i in range(150):
+    scene.step()
 
     image_paths = []
     base_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'images')
@@ -96,10 +96,21 @@ def create_scene_validation(objetsList, fixed=False):
 
     views = ["perspective", "top", "side", "side2"]
     images = []
+
+
+    try: 
+        font = ImageFont.truetype("arial.ttf", 25)
+    except: 
+        font = ImageFont.load_default()
+
     
     for name in views:
         rgb, _, _, _ = cameras[name].render(rgb=True)
         images.append(Image.fromarray(rgb))
+        draw = ImageDraw.Draw(images[-1])
+        draw.text((10, 10), name, font=font, fill=(255, 255, 255))
+
+
 
     widths, heights = zip(*(i.size for i in images))
     total_width = sum(widths)

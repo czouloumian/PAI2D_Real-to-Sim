@@ -11,12 +11,12 @@ def main():
     #itemsList = getFilePath(itemsList) #TODO: a changer plus tard
     itemsList = getOriginalDimensions(itemsList) #TODO: a changer plus tard
     
-    create_scene(itemsList)
+    #create_scene(itemsList)
     
     #boucle de validation avec le VLM:
     path_to_screenshot = create_scene_validation(itemsList)
-    prompt = "Je veux des ciseaux, un mug et une banane sur une table." #TODO: ana aura un truc qui donne les objets disponibles
-    validation = boucle_vlm(prompt, path, path_to_screenshot)
+    prompt = "Je veux des ciseaux à droite d'un mug et une banane à sa gauche."
+    validation = boucle_vlm(prompt, path)
     print("Validation:", validation)
 
     #truc de prompt de base
