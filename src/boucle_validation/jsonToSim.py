@@ -1,12 +1,53 @@
 import genesis as gs
 import os
 from PIL import Image, ImageDraw, ImageFont #https://pillow.readthedocs.io/en/stable/
+import copy
 
-#TODO
-#prendre le truc pour lire le JSON et extraire les infos des objets
-#truc des masses est important probablement
-#sauvegarder le screenshot de la scene la plus nouvelle a chaque fois pour pouvoir la donner au VLM
+def correction_physique(objetsList):
+    steps = 150
+    dt = 0.01
+    corrected_objects = copy.deepcopy(objetsList)
+    gs.init(backend=gs.cpu)
+    scene = gs.Scene(show_viewer=False, sim_options=gs.options.SimOptions(dt=dt))
+    scene.add_entity(gs.morphs.Plane())
+    entities = []
+    for obj in corrected_objects:
+        ent = scene.add_entity(
+            gs.morphs.URDF(
+                file=obj['path'],
+                pos=tuple(obj['pos']),
+                quat=tuple(obj.get('quat', [0.0, 1.0, 1.0, 0.0])),
+                scale=obj.get('scale', 1.0),
+                fixed=False 
+            ),
+            material=gs.materials.Rigid(rho=1000)
+        )
+        entities.append(ent)
+    scene.build()
+    for i, ent in enumerate(entities):
+        aabb_min, aabb_max = ent.get_AABB() #get aabb permet de trouver le vrai plus petit point de l'objet
+        z_min = float(aabb_min[2])
+        if z_min < 0.0: #ça veut dire que l'objet est partiellement sous le sol
+            correction = abs(z_min) + 0.001
+            corrected_objects[i]['pos'][2] += correction
+            current_pos = ent.get_pos()
+            ent.set_pos([current_pos[0], current_pos[1], current_pos[2] + correction])
 
+    z_init = [float(ent.get_pos()[2]) for ent in entities]
+    for _ in range(steps):
+        scene.step()
+    z_final = [float(ent.get_pos()[2]) for ent in entities]
+    for i, obj in enumerate(corrected_objects):
+        delta_z = z_final[i] - z_init[i]
+        v_z = delta_z / (steps * dt)
+        if v_z > 0.5: #l'objet a été expulsé vers le haut, donc il était trop bas
+            obj['pos'][2] += 0.05 
+        elif delta_z < -0.001: #l'onbjet est tombe donc il etait trop haut
+            obj['pos'][2] = z_final[i] #on met la hauteyr finale là où l'objet est retombé
+            # final_quat = ent.get_quat()
+            # obj['quat'] = [float(q) for q in final_quat]
+    gs.destroy()
+    return corrected_objects
 
 
 def create_scene(objetsList):
