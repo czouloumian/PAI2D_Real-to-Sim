@@ -249,7 +249,7 @@ def changePosFromRel(rel, item, subject):
     s_sub = subject.get('scale', 1.0)
     width, depth, height = [d * s_item for d in item['dimensions']]
     sw, sd, sh = [dim * s_sub for dim in subject['dimensions']]
-    x,y,x = item['pos']
+    x,y,z = item['pos']
     if not subject.get('dimensions'):
         subject = getOriginalDimensions(subject)
     s_sub = subject.get('scale', 1.0)

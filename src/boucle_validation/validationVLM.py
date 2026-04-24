@@ -371,7 +371,7 @@ def boucle_vlm_old(user_prompt, jsonFile, image_path, max_iter=3):
     return res
 
 
-def verif_fixage_sol(jsonFile, image_path):
+def verif_fixage_sol(jsonFile, image_path): #TODO: API perception genesis plutot pour verifier la vitesse dans les 100 pas si des objets volent ou tombent
     with open(jsonFile, 'r') as file:
         data = json.load(file)
     z_and_dims = [
@@ -454,7 +454,7 @@ def verif_fixage_sol(jsonFile, image_path):
     return resultat
 
 
-def verif_orientation(jsonFile, image_path, original_prompt): 
+def verif_orientation(jsonFile, image_path, original_prompt): #TODO: nécessaire?
     #TODO: voir si ça change depuis la position initial ou depuis les rotations qu'il y avait déjà    
     with open(jsonFile, 'r') as file:
         data = json.load(file)

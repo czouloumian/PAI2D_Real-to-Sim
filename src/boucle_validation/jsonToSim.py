@@ -3,7 +3,9 @@ import os
 from PIL import Image, ImageDraw, ImageFont #https://pillow.readthedocs.io/en/stable/
 import copy
 
-def correction_physique(objetsList):
+
+
+def validation_physique(objetsList): #TODO: résoudre aussi les collisions entre les objets
     steps = 150
     dt = 0.01
     corrected_objects = copy.deepcopy(objetsList)
@@ -33,6 +35,8 @@ def correction_physique(objetsList):
             current_pos = ent.get_pos()
             ent.set_pos([current_pos[0], current_pos[1], current_pos[2] + correction])
 
+    #TODO: on pourrait utiliser aabb_max pour les relations "on"
+
     z_init = [float(ent.get_pos()[2]) for ent in entities]
     for _ in range(steps):
         scene.step()
@@ -48,6 +52,9 @@ def correction_physique(objetsList):
             # obj['quat'] = [float(q) for q in final_quat]
     gs.destroy()
     return corrected_objects
+#TODO: on envoie les corrected objets à la boucle de validation et puis on boucle entre les deux
+#TODO: renvoyer ici aussi les photos?
+
 
 
 def create_scene(objetsList):
@@ -61,7 +68,7 @@ def create_scene(objetsList):
 
     scene = gs.Scene(show_viewer=True,vis_options=gs.options.VisOptions(show_world_frame=True,show_link_frame=True))
 
-    plane = scene.add_entity(gs.morphs.Plane())
+    plane = scene.add_entity(gs.morphs.Plane()) #
 
     #ajout des objets: une boucle for qui prend l'objet, sa position, son filepath, et qui crée les objets un par un
     for obj in objetsList:
@@ -108,7 +115,6 @@ def create_scene_validation(objetsList, fixed=False):
         "side2": scene.add_camera(res=(640, 480),pos=(3.5, 0.0, 0.5),lookat=(0, 0, 0.5),fov=30)
     }
 
-    font = ImageFont.load_default()
 
     #ajout des objets: une boucle for qui prend l'objet, sa position, son filepath, et qui crée les objets un par un
     for obj in objetsList:
@@ -174,3 +180,64 @@ def create_scene_validation(objetsList, fixed=False):
     gs.destroy()
     return path_collage
 
+
+
+
+#get_pos, get_quat
+#regarder comment faire pour récupérer la velocité
+#q_pos: les positions angulaires, pour les joints
+# = pour vérifier si tous les trucs sont stables
+
+#entity.get_contact : donne les infos sur tous les contacts qui sont dans la scène
+
+
+def ensure_stability(jsonFile, image_path):
+    #gets the pos of each object at each step during the simulation and checks if they are stable (not moving too much)
+    #if flying up, then not stable, and so we should change its z to be higher
+    #if flying down a lot, must lower the z
+    #entity.get_contact : à comparer avec les positions relatives que les objets sont censés avoir, mais d'abord aussi pour éviter que les objets ne soient enfonces dans le sol
+#    pass
+
+#def create_scene(objetsList):
+    '''
+    Fonction qui permet de creer la scene sur genesis à partir des infos objenues précédemment.
+    On commence par initialiser une scène vide, puis on rajoute les objets URDF.
+
+    :param objets: une liste de dictionnaires des infos pour chaque objet (id, urdf, path, pos)
+    '''
+    gs.init(backend=gs.cpu)
+
+    scene = gs.Scene(show_viewer=True,vis_options=gs.options.VisOptions(show_world_frame=True,show_link_frame=True))
+
+    plane = scene.add_entity(gs.morphs.Plane()) #TODO: regarder comment ajouter une texture au plan pour montrer les limites de chaque objet
+
+
+    #ajout des objets: une boucle for qui prend l'objet, sa position, son filepath, et qui crée les objets un par un
+    for obj in objetsList:
+        entity = scene.add_entity(
+            gs.morphs.URDF(
+                file=obj['path'],
+                pos=obj['pos'], 
+                quat=obj.get('quat', [0.0, 1.0, 1.0, 0.0]),
+                scale=obj.get('scale', 1.0),
+                fixed=False
+            ),
+            material=gs.materials.Rigid(rho=1000),
+        )
+
+    #TODO: ici, un if pour ne pas reconstruire la scène à chaque fois, mais juste faire les changements de pos et de quat des objets, pour que ça soit plus rapide et qu'on puisse faire les vérifications à chaque étape
+    scene.build()
+
+    for i in range(1000):
+        scene.step()
+        if i%100 == 0:
+            i = 0
+            for entity in scene.entities:
+                #liste des positions pour chaque donc liste de liste? et on les compare pour voir si ça a changé. 
+                # si ça a bcp changé, en fonction de si c'est vers le haut ou vers le bas, on modifie le z de l'objet.
+                #on fait une verif pour chaque entity, pour voir si elle est stable ou pas.
+                #print("contact:" +str(entity.get_contact())) #TODO: trouver quelle est cette commande
+                print("pos:" +str(entity.get_pos()))
+                #une fifo avec les dernières positions?
+
+    gs.destroy()

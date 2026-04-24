@@ -8,8 +8,8 @@ def create_scene(path):
 
     :param objets: une liste de dictionnaires des infos pour chaque objet (id, urdf, path, pos)
     '''
-    gs.init(backend=gs.cuda)
-    scene = gs.Scene(show_viewer=True, sim_options=gs.options.SimOptions(dt=0.0002))
+    gs.init(backend=gs.cpu)
+    scene = gs.Scene(show_viewer=True, sim_options=gs.options.SimOptions(dt=0.01))
     plane = scene.add_entity(gs.morphs.Plane())
     entity = scene.add_entity(
         gs.morphs.URDF(
@@ -17,10 +17,13 @@ def create_scene(path):
         ),
         material=gs.materials.Rigid(rho=1000),
     )
-    scene.build()
+    scene.build() #faire ça seulement une fois puis modif la pos des objets
     for i in range(1000):
         scene.step()
     gs.destroy()
+
+    #set position dans genesis au lieu de refaire
+#    set q_pos à 0 0 pourte fermée
     
 
 def main():
@@ -29,7 +32,7 @@ def main():
                             "10357_poubelle/mobility.urdf", "100073_cle_usb/mobility.urdf"]
 
     #ceux qui ne marchent pas: les erreurs sont differentes selon les objets
-    liste_partnet_marche_pas = ["7138_four/mobility.urdf", "10143_refrigerateur/mobility.urdf", "10211_ordinateur_portable/mobility.urdf", 
+    liste_partnet_marche_pas = ["10143_refrigerateur/mobility.urdf", "10211_ordinateur_portable/mobility.urdf", 
                                 "11826_lave_linge/mobility.urdf", "10357_poubelle/mobility.urdf", "11826_lave_linge/mobility.urdf",
                                 "44817_meuble_tiroirs/mobility.urdf","100658_boite_carton_ouverte/mobility.urdf","103369_lave_vaisselle/mobility.urdf",
                                 "103477_toaster/mobility.urdf"]
@@ -57,10 +60,12 @@ def main():
                                 "103477_toaster/mobility.urdf"]
 
 
-    for filename in curr:
-        items_folder = os.path.join(os.path.dirname(__file__),'..', 'objets')
-        path = os.path.join(items_folder, filename)
-        create_scene(path)
+    for filename in liste_partnet_marche_pas:
+        #items_folder = os.path.join(os.path.dirname(__file__),'..', 'objets')
+        #path = os.path.join(items_folder, filename)
+        
+
+        create_scene("/home/invite/PAI2D_Real-to-Sim/objets/10143_refrigerateur/mobility.urdf")
 
 if __name__=="__main__":
     main()
