@@ -89,7 +89,7 @@ def create_run_dir():
 
 
 def save_iteration_scene(image_path, iter, run_dir, itemsList):
-    shutil.copy(image_path, os.path.join(run_dir, f"iteration_{iter}_image.png"))
+    shutil.copy(image_path, os.path.join(run_dir, f"iteration_{iter}_image_v2.png"))
     with open(os.path.join(run_dir, f'iter_{iter}_scene.json'), 'w') as f:
         json.dump({'objets': itemsList}, f, indent=4)
 
@@ -134,7 +134,7 @@ def clean_reponse(resultat):
     return ""
 
 
-def boucle_vlm(user_prompt, jsonFile, max_iter=3):
+def boucle_vlm_v2(user_prompt, jsonFile, max_iter=3):
 
     run_dir = create_run_dir()
     history = []
@@ -156,7 +156,6 @@ def boucle_vlm(user_prompt, jsonFile, max_iter=3):
 
         history.append(copy.deepcopy({
             'iteration': iter,
-            'phase': "semantique",
             'feedback': res.get('feedback', ''),
             'corrections': res.get('corrections',''),
             'valid': res.get('valid', False),
@@ -234,91 +233,3 @@ def etapes_validation(original_prompt, data, image_path):
         corrections = {c['id']: c['pos'] for c in resultat['corrections']}
         data = correct_list(data, corrections, 'pos')
     return resultat, data
-
-
-def validation_physique(objetsList): #TODO: résoudre aussi les collisions entre les objets
-    steps = 150
-    dt = 0.01
-    corrected_objects = copy.deepcopy(objetsList)
-    gs.init(backend=gs.cpu)
-    scene = gs.Scene(show_viewer=False, sim_options=gs.options.SimOptions(dt=dt))
-    scene.add_entity(gs.morphs.Plane())
-    cameras = {
-        "perspective":scene.add_camera(res=(640, 480), pos=(3.5, 0.0, 2.5), lookat=(0, 0, 0.5), fov=30),
-        "top":scene.add_camera(res=(640, 480), pos=(0.0, 0.0, 4.0), lookat=(0, 0, 0),   fov=40),
-        "side":scene.add_camera(res=(640, 480), pos=(0.0, 3.5, 1.0), lookat=(0, 0, 0.5), fov=30),
-        "side2": scene.add_camera(res=(640, 480),pos=(3.5, 0.0, 0.5),lookat=(0, 0, 0.5),fov=30)
-    }
-    entities = []
-    for obj in corrected_objects:
-        ent = scene.add_entity(
-            gs.morphs.URDF(
-                file=obj['path'],
-                pos=tuple(obj['pos']),
-                quat=tuple(obj.get('quat', [0.0, 1.0, 1.0, 0.0])),
-                scale=obj.get('scale', 1.0),
-                fixed=False 
-            ),
-            material=gs.materials.Rigid(rho=1000)
-        )
-        entities.append(ent)
-    scene.build()
-    for i, ent in enumerate(entities):
-        aabb_min, aabb_max = ent.get_AABB() #get aabb permet de trouver le vrai plus petit point de l'objet
-        z_min = float(aabb_min[2])
-        if z_min < 0.0: #ça veut dire que l'objet est partiellement sous le sol
-            correction = abs(z_min) + 0.001
-            corrected_objects[i]['pos'][2] += correction
-            current_pos = ent.get_pos()
-            ent.set_pos([current_pos[0], current_pos[1], current_pos[2] + correction])
-
-    #TODO: on pourrait utiliser aabb_max pour les relations "on"
-
-    z_init = [float(ent.get_pos()[2]) for ent in entities]
-    for _ in range(steps):
-        scene.step()
-    z_final = [float(ent.get_pos()[2]) for ent in entities]
-    for i, obj in enumerate(corrected_objects):
-        delta_z = z_final[i] - z_init[i]
-        v_z = delta_z / (steps * dt)
-        if v_z > 0.5: #l'objet a été expulsé vers le haut, donc il était trop bas
-            obj['pos'][2] += 0.05 
-        elif delta_z < -0.001: #l'onbjet est tombe donc il etait trop haut
-            obj['pos'][2] = z_final[i] #on met la hauteyr finale là où l'objet est retombé
-            # final_quat = ent.get_quat()
-            # obj['quat'] = [float(q) for q in final_quat]
-  
-    image_paths = []
-    base_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'images')
-    os.makedirs(base_dir, exist_ok=True)
-
-    views = ["perspective", "top", "side", "side2"]
-    images = []
-
-    try: 
-        font = ImageFont.truetype("arial.ttf", 25)
-    except: 
-        font = ImageFont.load_default()
-    
-    for name in views:
-        rgb, _, _, _ = cameras[name].render(rgb=True)
-        images.append(Image.fromarray(rgb))
-        draw = ImageDraw.Draw(images[-1])
-        draw.text((10, 10), name, font=font, fill=(255, 255, 255))
-
-    widths, heights = zip(*(i.size for i in images))
-    total_width = sum(widths)
-    max_height = max(heights)
-
-    collage = Image.new('RGB', (total_width, max_height))
-
-    x_offset = 0
-    for im in images:
-        collage.paste(im, (x_offset, 0))
-        x_offset += im.size[0]
-
-    path_collage = os.path.abspath("images/collage_validation.png")
-    collage.save(path_collage)
-
-    gs.destroy()
-    return path_collage, corrected_objects

@@ -5,8 +5,13 @@ import json
 import re
 import shutil
 from datetime import datetime
-from .jsonToSim import create_scene_validation
+from .jsonToSim import create_scene_validation, validation_physique
 from PIL import Image
+import xml.etree.ElementTree as ET
+import trimesh
+import copy
+
+
 
 def getFilePath(itemsList):
     '''
@@ -31,6 +36,51 @@ def getFilePath(itemsList):
 
     return itemsList
 
+def getOriginalDimensions(items): #TODO: attention c'est pas la meme que dans v1, à changer
+    '''
+    Extrait les dimensions de l'item URDF, qui sont dans '<geometry>'
+
+    :param filepath: le path pour le file urdf
+    :return: l'item avec ses dimensions
+    '''
+    for item in items:
+        if item.get('dimensions'):
+            continue
+        else:
+            tree = ET.parse(item['path']) #lecture du fichier urdf en xml
+            root = tree.getroot()
+
+            for geometry in root.iter('geometry'):
+                box= geometry.find('box')
+                cylinder= geometry.find('cylinder')
+                sphere= geometry.find('sphere')
+                mesh_tag = geometry.find('mesh') #quand les formes sont plus complexes c'est généralement mesh qui est utilisé
+                if box is not None:
+                    size = box.attrib['size'].split()
+                    item['dimensions'] = (float(size[0]),float(size[1]), float(size[2]))
+                elif cylinder is not None:
+                    r = float(cylinder.attrib['radius'])
+                    length = float(cylinder.attrib['length'])
+                    item['dimensions'] = (r*2, r*2, length)
+                elif sphere is not None:
+                    r = float(sphere.attrib['radius'])
+                    item['dimensions'] = (r*2, r*2, r*2)
+                elif mesh_tag is not None:
+                    directory = os.path.dirname(item['path'])
+                    path_mesh = os.path.join(directory, mesh_tag.attrib['filename'])
+                    mesh = trimesh.load(path_mesh, force='mesh') #force='mesh' est pour ne pas avoir de scene, seulement un mesh unique
+                    bounds = mesh.bounding_box.extents
+                    item['dimensions'] = (float(bounds[0]),float(bounds[1]),float(bounds[2]))
+                else:
+                    print("Dimensions non trouvées") #TODO: faire une meilleure erreur
+                    item['dimensions'] = (0.1,0.1,0.1)
+    return items
+
+def save_iteration_scene(image_path, iter, run_dir, itemsList):
+    shutil.copy(image_path, os.path.join(run_dir, f"iteration_{iter}_image_v2.png"))
+    with open(os.path.join(run_dir, f'iter_{iter}_scene.json'), 'w') as f:
+        json.dump({'objets': itemsList}, f, indent=4)
+
 def create_run_dir():
     '''un dossier pour chaque run'''
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -38,6 +88,17 @@ def create_run_dir():
     os.makedirs(run_dir, exist_ok=True)
     return run_dir
 
+def correct_list(data, corrections, field):
+    existing_id = {item['id'] for item in data}
+    for c_id in corrections.keys():
+        if c_id not in existing_id:
+            print(f"ATTENTION: l'ID {c_id} n'est pas dans la liste, skipping correction.")
+    for item in data:
+        if item['id'] in corrections:
+            old_value = item[field]
+            item[field] = corrections[item['id']]
+            print(f"CORRECTION: {field} corrigée pour {item['id']}: {old_value} → {item[field]}")
+    return data
 
 def clean_reponse(resultat):
     resultat = re.sub(r'```json|```', '', resultat) 
@@ -50,101 +111,106 @@ def clean_reponse(resultat):
         resultat = resultat[start:end]
     return resultat
 
-
-def boucle_vlm(user_img, jsonFile, max_iter=5):
-
+def boucle_vlm(user_image_path, jsonFile, max_iter=3):
+    '''
+    Boucle de validation qui compare la scène générée à une image de référence fournie par l'utilisateur.
+    '''
     run_dir = create_run_dir()
     history = []
-    #on met l'image donnée par l'user dans la première ligne du collage
-    im_width, im_height = zip(*(user_img.size))
-    collage = Image.new('RGB', (im_width, im_height))
-    collage.paste(user_img, (0,0))
 
     for iter in range(max_iter):
+        
         with open(jsonFile, 'r') as file:
             data = json.load(file)
+        
         itemsList = data.get('objets', [])
-        image_path = create_scene_validation(itemsList, fixed=True)
-        shutil.copy(image_path, os.path.join(run_dir, f"image_iteration_{iter}_image.png"))
-        with open(os.path.join(run_dir, f'iter_sol_{iter}_scene.json'), 'w') as f:
-            json.dump(data, f)
+        itemsList = getOriginalDimensions(itemsList) 
 
-        # TODO: faire le collage avec première image du collage étant la photo de l'user, et le reste la current generation. ou alors avoir une ligne dans le collage pour chaque essai??
-        #donc TODO: rajouter les images de la génération en tant que nouvelle colonne à l'image à chaque fois
-        path_collage = os.path.abspath("images/collage_validation.png")
-        collage.save(path_collage)
-        #
+        scene_image_path, corrected_objects = validation_physique(itemsList)
 
-        #TODO: pos and dims only??
-        pos_and_quat = [{'id': item['id'], 'pos': item['pos'], 'quaternions':item['quat']} for item in data['objets']]
+        print("CORRECTED OBJECTS:", corrected_objects)
 
-        prompt = """You are a scene corrector. Your task is for the generated scene to look similar to the scene given by the user. For this, you should adjust the JSON file for scene generation.
+        save_iteration_scene(scene_image_path, iter, run_dir, itemsList)
         
-                    You will receive:
-                    - the dimensions (x,y,z) and orientations (rotation in quaternions) of all 
-                    - a collage containing ONE ORIGINAL image from the user, followed by FOUR images of the same scene:
-                        1. PERSPECTIVE VIEW: General context.
-                        2. TOP-DOWN VIEW: Best for X, Y coordinates and checking if objects are side-by-side.
-                        3. SIDE VIEW: Best for Z coordinate (height) to check if objects are at the right height.
-                        4. SECOND SIDE VIEW: Best for checking if objects are properly placed below the ground plane.
-                    - a json file containing history of the correction you have already made to 
-                        
-                You MUST respond with ONLY this JSON format:
-                {
-                    "valid": false,
-                    "feedback": "mug is clipping into ground",
-                    "corrections": [
-                        {"id": "mug", "pos": [0.3, 0.0, 0.5]},
-                        {"id": "table", "pos": 0.[0.0, 0.0, 0.375]}
-                    ]
-                }
-                """
-        
-        resultat = ollama.chat(model="llama3.2-vision", messages=[{'role': 'system', 'content': prompt},{'role': 'user','content':f"History of runs and corrections: {history}\nCurrent objects positions and orientations: {json.dumps(pos_and_quat)}",'images': [image_path]}])
-        clean = clean_reponse(resultat['message']['content'])
-        try:
-            resultat = json.loads(clean)
-        except json.JSONDecodeError:
-            print(f"json invalide pour itération {iter}")
+        # 2. Validation sémantique (VLM compare l'image utilisateur et le screenshot Genesis)
+        res, data = etapes_validation(user_image_path, corrected_objects, scene_image_path)
+        print(f"DEBUG: les res keys sont {res.keys()} et le contenu est {res}")
 
-        if 'corrections' in resultat:
-            corrections = {c['id']: c['pos'] for c in resultat['corrections']}
-            for item in data['objets']:
-                if item['id'] in corrections:
-                    old_pos = item['pos']
-                    item['pos'] = corrections[item['id']]
-                    print(f"Pos corrigée pour {item['id']}: {old_pos} → {item['pos']}")
-            #TODO: corriger les quats désolée j'ai pas eu le temps
-            with open(jsonFile, 'w') as file:
-                json.dump(data, file, indent=4)
-            
-                with open(jsonFile, 'w') as file:
-                    json.dump(data, file, indent=4)
-    
-
-        history.append({
+        history.append(copy.deepcopy({
             'iteration': iter,
-            'feedback': resultat.get('feedback', ''),
-            'corrections': resultat.get('corrections',''),
-            'valid': resultat.get('valid', False)
-        })
+            'feedback': res.get('feedback', ''),
+            'corrections': res.get('corrections',''),
+            'valid': res.get('valid', False),
+            'scene': data
+        }))
+        
         with open(os.path.join(run_dir, 'history.json'), 'w') as f:
             json.dump(history, f, indent=4)
 
-        if resultat.get('valid'):
-            print("FIXAGE VALIDE")
-            break
+        if res.get("valid") == True:
+            print("Scène validée visuellement et physiquement !")
+            return data
         else:
-            if "new_scene" in resultat:
-                with open(jsonFile, 'w') as file:
-                    json.dump({'objets': resultat['new_scene']['objets']}, file) 
-            else:
-                if 'objets' in resultat:
-                    items = resultat['objets']
-                    with open(jsonFile, 'w') as file:
-                        json.dump({'objets': items}, file)
-                else:
-                    print("le llm n'a pas donné de nouvelle scene")
-                    continue
+            print("Échec / Corrections en cours : ", res.get("feedback"))
 
-    return resultat
+    else:
+        print("Nombre maximum d'itérations atteint.")
+        return data
+
+
+def etapes_validation(user_image_path, data, scene_image_path):
+    '''
+    Envoie l'image cible et l'image de la scène au VLM pour obtenir les corrections de coordonnées.
+    '''
+    pos_and_dims = [{'id': item['id'], 'pos': item['pos'], 'dimensions':item['dimensions']} for item in data]
+    
+    prompt = """You are a 3D Scene Validator and Spatial Coordinator. Your goal is to ensure the simulated objects match the spatial arrangement seen in the REFERENCE image.
+
+            You will receive:
+                - Image 1: The REFERENCE image (what the scene must look like).
+                - Image 2: The CURRENT SIMULATION (a collage of Perspective, Top, and Side views).
+                - A JSON list with the current positions (pos) and dimensions of each object.
+
+            Spatial RULES:
+            - Goal: Adjust the X, Y, Z coordinates of the simulated objects so they match the relative positioning, stacking, and alignment shown in the REFERENCE image.
+            - Stacking (On Top): For Object A to be "on" Object B, X and Y must be within the space covered by object B. Object A's lowest point must be 0.001 higher than object B's highest point.
+            - Collisions: Objects must not logically intersect unless explicitly shown in the reference image. If they overlap in the Top-Down view, they must have different Z-heights to avoid clipping.
+            - Ground Plane: No object's lowest point should be below 0.
+
+            Other RULES:
+                - ONLY change pos if needed to match the reference image.
+                - Maintain the original id for all objects.
+                - `valid` is true ONLY if the current simulation perfectly matches the reference image arrangement AND has no illogical collisions.
+                - ONLY output the JSON object, nothing else.
+                - NO markdown, NO backticks, NO explanations before or after.
+
+            You MUST respond with ONLY this JSON format:
+            {
+                "valid": boolean,
+                "feedback": "Reasoning for changes (e.g., 'Moving mug to be on the left of the laptop to match the reference image')",
+                "corrections": [{"id": "string", "pos": [x, y, z]}]
+            }
+   """
+
+    resultat = ollama.chat(
+        model="qwen2.5vl:3b",
+        messages=[
+            {'role': 'system', 'content': prompt},
+            {'role': 'user',
+             'content': f"Current Objects and positions: {json.dumps(pos_and_dims)}\nReview the reference image (first) and the current simulation (second).",
+             'images': [user_image_path, scene_image_path]} 
+        ]
+    )
+    
+    clean = clean_reponse(resultat['message']['content'])
+    try:
+        resultat = json.loads(clean)
+    except json.JSONDecodeError:
+        print("json invalide pour etapes_validation")
+        return {"valid": False, "feedback": "json invalide"}
+        
+    if 'corrections' in resultat:
+        corrections = {c['id']: c['pos'] for c in resultat['corrections']}
+        data = correct_list(data, corrections, 'pos')
+        
+    return resultat, data
