@@ -242,7 +242,8 @@ def validation_physique(objetsList): #TODO: résoudre aussi les collisions entre
     corrected_objects = copy.deepcopy(objetsList)
     gs.init(backend=gs.cpu)
     scene = gs.Scene(show_viewer=False, sim_options=gs.options.SimOptions(dt=dt))
-    scene.add_entity(gs.morphs.Plane())
+    scene.add_entity(gs.morphs.Plane()) #TODO: regarder les textures pour voir si ça peut améliorer les choses de mettre des bounds!!!!! d
+    #donner les x et y bounds au llm. dire de ne pas s'approcher trop pres du bord de la table. it slays
     cameras = {
         "perspective":scene.add_camera(res=(640, 480), pos=(3.5, 0.0, 2.5), lookat=(0, 0, 0.5), fov=30),
         "top":scene.add_camera(res=(640, 480), pos=(0.0, 0.0, 4.0), lookat=(0, 0, 0),   fov=40),
