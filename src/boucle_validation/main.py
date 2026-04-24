@@ -2,7 +2,7 @@ import json
 import os
 from jsonToSim import create_scene, create_scene_validation, validation_physique
 from validationVLM import getFilePath, getOriginalDimensions
-from validationHybride import boucle_vlm
+from boucle_validation.validationHybride_v2 import boucle_vlm
 
 def main():
     path = os.path.join(os.path.dirname(__file__), 'exemple.json')

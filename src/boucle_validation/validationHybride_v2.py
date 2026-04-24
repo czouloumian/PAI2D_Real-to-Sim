@@ -89,7 +89,7 @@ def create_run_dir():
 
 
 def save_iteration_scene(image_path, iter, run_dir, itemsList):
-    shutil.copy(image_path, os.path.join(run_dir, f"iteration_{iter}_image.png"))
+    shutil.copy(image_path, os.path.join(run_dir, f"iteration_{iter}_image_v2.png"))
     with open(os.path.join(run_dir, f'iter_{iter}_scene.json'), 'w') as f:
         json.dump({'objets': itemsList}, f, indent=4)
 
@@ -134,7 +134,7 @@ def clean_reponse(resultat):
     return ""
 
 
-def boucle_vlm(user_prompt, jsonFile, max_iter=3):
+def boucle_vlm_v2(user_prompt, jsonFile, max_iter=3):
 
     run_dir = create_run_dir()
     history = []
@@ -156,7 +156,6 @@ def boucle_vlm(user_prompt, jsonFile, max_iter=3):
 
         history.append(copy.deepcopy({
             'iteration': iter,
-            'phase': "semantique",
             'feedback': res.get('feedback', ''),
             'corrections': res.get('corrections',''),
             'valid': res.get('valid', False),
