@@ -32,6 +32,7 @@ def boucle_vlm_prompt(user_prompt, jsonFile, max_iter=3):
             'scene': data
         }))
         with open(os.path.join(run_dir, 'history.json'), 'w') as f:
+            print("history:", history)
             json.dump(history, f, indent=4)
 
         if res.get("valid")==True:
@@ -46,12 +47,12 @@ def boucle_vlm_prompt(user_prompt, jsonFile, max_iter=3):
 
 
 def validation_semantique_prompt(original_prompt, data, image_path):
-    pos_and_dims = [{'id': item['id'], 'pos': item['pos'], 'dimensions':item['dimensions']} for item in data]
+    pos_and_dims = [{'id': item['id'], 'pos': item['pos'], 'dimensions':item['dimensions'], 'lowest_point':item['lowest_point'],'highest_point':item['highest_point']} for item in data]
     prompt = """ You are a 3D Scene Validator and Spatial Coordinator. Your goal is to ensure objects are logically placed and match the prompt's description.
 
             You will receive:
                 - The current scene as a JSON object
-                - The position and dimensions of each object
+                - The position, dimensions , lowest point and highest point of each object
                 - a collage containing THREE images of the same scene:
                     1. PERSPECTIVE VIEW: General context.
                     2. TOP-DOWN VIEW: Best for X, Y coordinates and checking if objects are side-by-side.

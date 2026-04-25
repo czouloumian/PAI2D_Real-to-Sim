@@ -4,11 +4,11 @@
             "id": "mug",
             "urdf": "ycb_mug.urdf",
             "path": "/home/invite/PAI2D_Real-to-Sim/src/version2/../../objets/ycb_mug.urdf",
-            "scale": 0.26,
+            "scale": 1,
             "pos": [
+                0.2,
                 0.0,
-                0.0,
-                0.01
+                0.71
             ],
             "quat": [
                 0,
@@ -26,11 +26,11 @@
             "id": "banane",
             "urdf": "model.urdf",
             "path": "/home/invite/PAI2D_Real-to-Sim/src/version2/../../objets/011_banane/google_16k/model.urdf",
-            "scale": 0.26,
+            "scale": 1,
             "pos": [
                 0.0,
-                0.0,
-                0.35
+                0.1,
+                0.75
             ],
             "quat": [
                 0.707,
@@ -48,11 +48,11 @@
             "id": "scissors",
             "urdf": "model.urdf",
             "path": "/home/invite/PAI2D_Real-to-Sim/src/version2/../../objets/037_scissors/google_16k/model.urdf",
-            "scale": 0.26,
+            "scale": 1,
             "pos": [
+                0.1,
                 0.0,
-                0.0,
-                0.35
+                0.75
             ],
             "quat": [
                 0,
@@ -70,7 +70,7 @@
             "id": "table",
             "urdf": "table.urdf",
             "path": "/home/invite/PAI2D_Real-to-Sim/src/version2/../../objets/table.urdf",
-            "scale": 0.26,
+            "scale": 1,
             "pos": [
                 0.0,
                 0.0,
@@ -79,8 +79,8 @@
             "quat": [
                 0,
                 0,
-                1,
-                0
+                0,
+                1
             ],
             "dimensions": [
                 0.05,

@@ -1,8 +1,8 @@
 import os
-import datetime
+from datetime import datetime
 import json
 import shutil
-import trimesh
+import re
 
 
 def getFilePath(item):
@@ -53,6 +53,17 @@ def correct_list(data, corrections, field):
             item[field] = corrections[item['id']]
             print(f"CORRECTION: {field} corrigée pour {item['id']}: {old_value} → {item[field]}")
     return data
+
+
+def clean_reponse(resultat):
+    resultat = re.sub(r'```', '', resultat)
+    start = resultat.find('{')
+    end = resultat.rfind('}') + 1
+    if start != -1 and end != 0:
+        json_str = resultat[start:end]
+        json_str = json_str.replace('True', 'true').replace('False', 'false') 
+        return json_str
+    return ""
 
 
 # def getOriginalDimensions(items): #TODO: attention c'est pas la meme que dans v1, à changer

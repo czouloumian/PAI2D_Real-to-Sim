@@ -1,0 +1,43 @@
+{
+    "objets": [
+        {
+            "id": "mug",
+            "urdf": "ycb_mug.urdf",
+            "path": "/home/invite/PAI2D_Real-to-Sim/src/version2/../../objets/ycb_mug.urdf",
+            "scale": 1,
+            "pos": [
+                0.2,
+                0.0,
+                0.71
+            ],
+            "quat": [
+                0,
+                0,
+                0,
+                1
+            ],
+            "dimensions": [
+                0.116984,
+                0.093131,
+                0.081303
+            ]
+        },
+        {
+            "id": "banane",
+            "urdf": "011_banane/google_16k/model.urdf",
+            "path": "/home/invite/PAI2D_Real-to-Sim/src/version2/../../objets/011_banane/google_16k/model.urdf",
+            "scale": 1,
+            "pos": [
+                0.2,
+                0.0,
+                0.71
+            ],
+            "quat": [
+                0,
+                0,
+                0,
+                1
+            ]
+        }
+    ]
+}

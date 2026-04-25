@@ -2,7 +2,7 @@
 import os
 import ollama
 import json
-from .jsonToSim import validation_physique
+from jsonToSim import validation_physique
 from validation_utils import  create_run_dir, correct_list, clean_reponse, save_iteration_scene
 from PIL import Image
 import xml.etree.ElementTree as ET
@@ -16,19 +16,18 @@ def boucle_vlm_img(user_image_path, jsonFile, max_iter=3):
     run_dir = create_run_dir()
     history = []
 
-    for iter in range(max_iter):
-        
-        with open(jsonFile, 'r') as file:
+    with open(jsonFile, 'r') as file:
             data = json.load(file)
-        
-        itemsList = data.get('objets', [])
+    itemsList = data.get('objets', [])
+
+    for iter in range(max_iter):
+
         scene_image_path, corrected_objects = validation_physique(itemsList)
 
         print("CORRECTED OBJECTS:", corrected_objects)
 
         save_iteration_scene(scene_image_path, iter, run_dir, itemsList)
-        
-        # 2. Validation sémantique (VLM compare l'image utilisateur et le screenshot Genesis)
+
         res, data = validation_semantique_img(user_image_path, corrected_objects, scene_image_path)
         print(f"DEBUG: les res keys sont {res.keys()} et le contenu est {res}")
 
@@ -44,10 +43,11 @@ def boucle_vlm_img(user_image_path, jsonFile, max_iter=3):
             json.dump(history, f, indent=4)
 
         if res.get("valid") == True:
-            print("Scène validée visuellement et physiquement !")
+            print("Scène validée")
             return data
         else:
-            print("Échec / Corrections en cours : ", res.get("feedback"))
+            print("Qcène non validée: ", res.get("feedback"))
+            itemsList = data
 
     else:
         print("Nombre maximum d'itérations atteint.")
@@ -70,13 +70,13 @@ def validation_semantique_img(user_image_path, data, scene_image_path):
             Spatial RULES:
             - Goal: Adjust the X, Y, Z coordinates of the simulated objects so they match the relative positioning, stacking, and alignment shown in the REFERENCE image.
             - Stacking (On Top): For Object A to be "on" Object B, X and Y must be within the space covered by object B. Object A's lowest point must be 0.001 higher than object B's highest point.
-            - Collisions: Objects must not logically intersect unless explicitly shown in the reference image. If they overlap in the Top-Down view, they must have different Z-heights to avoid clipping.
+            - Collisions: Objects must not intersect unless explicitly shown in the reference image. If they overlap in the Top-Down view, they must have different Z-heights to avoid clipping, or different X or Y.
             - Ground Plane: No object's lowest point should be below 0.
 
             Other RULES:
                 - ONLY change pos if needed to match the reference image.
                 - Maintain the original id for all objects.
-                - `valid` is true ONLY if the current simulation perfectly matches the reference image arrangement AND has no illogical collisions.
+                - 'valid' is true ONLY if the current simulation perfectly matches the reference image arrangement AND has no illogical collisions.
                 - ONLY output the JSON object, nothing else.
                 - NO markdown, NO backticks, NO explanations before or after.
 

@@ -32,12 +32,11 @@ def validation_physique(objetsList): #TODO: résoudre aussi les collisions entre
         entities.append(ent)
     scene.build()
 
-    z_init = [float(ent.get_pos()[2]) for ent in entities]
-    for _ in range(steps):
-        scene.step()
 
     for i, ent in enumerate(entities):
-        aabb_min, aabb_max = ent.get_AABB() 
+        aabb_min, aabb_max = ent.get_AABB()
+        obj['lowest_point'] = float(aabb_min[2])
+        obj['highest_point'] = float(aabb_max[2])
         
         w = float(aabb_max[0] - aabb_min[0])
         d = float(aabb_max[1] - aabb_min[1])
@@ -52,18 +51,22 @@ def validation_physique(objetsList): #TODO: résoudre aussi les collisions entre
             current_pos = ent.get_pos()
             ent.set_pos([current_pos[0], current_pos[1], current_pos[2] + correction])
 
-        z_final = [float(ent.get_pos()[2]) for ent in entities]
-        for i, obj in enumerate(corrected_objects):
-            delta_z = z_final[i] - z_init[i]
-            v_z = delta_z / (steps * dt)
-            if v_z > 0.5: #l'objet a été expulsé vers le haut, donc il était trop bas
-                obj['pos'][2] += 0.05
-                obj['lowest_point'] += 0.05
-                obj['highest_point'] += 0.05
-            elif delta_z < -0.001: #l'onbjet est tombe donc il etait trop haut
-                obj['pos'][2] = z_final[i] #on met la hauteyr finale là où l'objet est retombé
-                # final_quat = ent.get_quat()
-                # obj['quat'] = [float(q) for q in final_quat]
+    z_init = [float(ent.get_pos()[2]) for ent in entities]
+    for _ in range(steps):
+        scene.step()
+
+    z_final = [float(ent.get_pos()[2]) for ent in entities]
+    for i, obj in enumerate(corrected_objects):
+        delta_z = z_final[i] - z_init[i]
+        v_z = delta_z / (steps * dt)
+        if v_z > 0.5: #l'objet a été expulsé vers le haut, donc il était trop bas
+            obj['pos'][2] += 0.05
+            obj['lowest_point'] += 0.05
+            obj['highest_point'] += 0.05
+        elif delta_z < -0.001: #l'onbjet est tombe donc il etait trop haut
+            obj['pos'][2] = z_final[i] #on met la hauteyr finale là où l'objet est retombé
+            # final_quat = ent.get_quat()
+            # obj['quat'] = [float(q) for q in final_quat]
   
     base_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'images')
     os.makedirs(base_dir, exist_ok=True)
@@ -101,37 +104,37 @@ def validation_physique(objetsList): #TODO: résoudre aussi les collisions entre
 
 
 
-# def create_scene(objetsList):
-#     '''
-#     Fonction qui permet de creer la scene sur genesis à partir des infos objenues précédemment.
-#     On commence par initialiser une scène vide, puis on rajoute les objets URDF.
+def create_scene(objetsList):
+    '''
+    Fonction qui permet de creer la scene sur genesis à partir des infos objenues précédemment.
+    On commence par initialiser une scène vide, puis on rajoute les objets URDF.
 
-#     :param objets: une liste de dictionnaires des infos pour chaque objet (id, urdf, path, pos)
-#     '''
-#     gs.init(backend=gs.cpu)
+    :param objets: une liste de dictionnaires des infos pour chaque objet (id, urdf, path, pos)
+    '''
+    gs.init(backend=gs.cpu)
 
-#     scene = gs.Scene(show_viewer=True,vis_options=gs.options.VisOptions(show_world_frame=True,show_link_frame=True))
+    scene = gs.Scene(show_viewer=True,vis_options=gs.options.VisOptions(show_world_frame=True,show_link_frame=True))
 
-#     plane = scene.add_entity(gs.morphs.Plane()) #
+    plane = scene.add_entity(gs.morphs.Plane()) #
 
-#     #ajout des objets: une boucle for qui prend l'objet, sa position, son filepath, et qui crée les objets un par un
-#     for obj in objetsList:
-#         entity = scene.add_entity(
-#             gs.morphs.URDF(
-#                 file=obj['path'],
-#                 pos=obj['pos'], 
-#                 quat=obj.get('quat', [0.0, 1.0, 1.0, 0.0]),
-#                 scale=obj.get('scale', 1.0),
-#                 fixed=False
-#             ),
-#             material=gs.materials.Rigid(rho=1000),
-#         )
+    #ajout des objets: une boucle for qui prend l'objet, sa position, son filepath, et qui crée les objets un par un
+    for obj in objetsList:
+        entity = scene.add_entity(
+            gs.morphs.URDF(
+                file=obj['path'],
+                pos=obj['pos'], 
+                quat=obj.get('quat', [0.0, 1.0, 1.0, 0.0]),
+                scale=obj.get('scale', 1.0),
+                fixed=False
+            ),
+            material=gs.materials.Rigid(rho=1000),
+        )
 
-#     scene.build()
+    scene.build()
 
-#     for i in range(1000):
-#         scene.step()
-#     gs.destroy()
+    for i in range(1000):
+        scene.step()
+    gs.destroy()
 
 
 # def create_scene_validation(objetsList, fixed=False):
