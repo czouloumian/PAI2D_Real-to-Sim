@@ -2,7 +2,7 @@
 
 Génération automatique de scènes pour le simulateur Genesis à partir de prompts texte ou d'images.
 
-Ce README explique  **l'installation et le lancement** de notre logiciel. Pour les détails techniques (architecture, pipelines, modèles, choix d'implémentation), voir le rapport associé dans \documentation
+Ce README explique  **l'installation et le lancement** de notre logiciel. Pour les détails techniques (architecture, pipelines, modèles, choix d'implémentation), voir le [rapport associé](documentation/PAI2D_rapport.pdf).
 
 ---
 
